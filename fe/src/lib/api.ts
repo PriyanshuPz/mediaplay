@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://panda.local/api";
 
 export interface MediaFile {
   file_id: number;

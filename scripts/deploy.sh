@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+sudo systemctl stop panel
+
 echo "→ Updating panel"
 git pull --ff-only
 
