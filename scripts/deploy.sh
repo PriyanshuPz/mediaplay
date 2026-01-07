@@ -5,10 +5,10 @@ echo "→ Updating panel"
 git pull --ff-only
 
 echo "→ Installing dependencies"
-bun install
+pnpm install
 
 echo "→ Building frontend"
-bun run build
+pnpm run build
 
 echo "→ Restarting panel"
 sudo systemctl restart panel
