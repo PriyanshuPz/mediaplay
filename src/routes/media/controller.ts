@@ -177,7 +177,6 @@ class MediaAPIController {
       const stats = fs.statSync(file.path);
       const range = c.req.header("range");
 
-      // Always use partial content for better streaming
       const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
       let start = 0;
       let end = stats.size - 1;
@@ -185,9 +184,16 @@ class MediaAPIController {
       if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
         start = parseInt(parts[0], 10);
-        end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
+
+        if (parts[1] && parts[1].length > 0) {
+          // Client specified exact end byte
+          end = parseInt(parts[1], 10);
+        } else {
+          // Client sent open-ended range like "bytes=0-" - limit chunk size
+          end = Math.min(start + CHUNK_SIZE - 1, stats.size - 1);
+        }
       } else {
-        // If no range requested, send first chunk only
+        // No range header - send first chunk only
         end = Math.min(CHUNK_SIZE - 1, stats.size - 1);
       }
 
