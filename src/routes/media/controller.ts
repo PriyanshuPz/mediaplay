@@ -177,38 +177,35 @@ class MediaAPIController {
       const stats = fs.statSync(file.path);
       const range = c.req.header("range");
 
+      // Always use partial content for better streaming
+      const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+      let start = 0;
+      let end = stats.size - 1;
+
       if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
-        const chunksize = end - start + 1;
-
-        c.header("Content-Range", `bytes ${start}-${end}/${stats.size}`);
-        c.header("Accept-Ranges", "bytes");
-        c.header("Content-Length", `${chunksize}`);
-        c.header("Content-Type", file.mime || "video/x-matroska");
-        c.status(206);
-
-        return stream(c, async (stream) => {
-          const fileStream = fs.createReadStream(file.path, { start, end });
-
-          for await (const chunk of fileStream) {
-            await stream.write(chunk);
-          }
-        });
+        start = parseInt(parts[0], 10);
+        end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
       } else {
-        c.header("Content-Length", `${stats.size}`);
-        c.header("Content-Type", file.mime || "video/x-matroska");
-        c.header("Accept-Ranges", "bytes");
-
-        return stream(c, async (stream) => {
-          const fileStream = fs.createReadStream(file.path);
-
-          for await (const chunk of fileStream) {
-            await stream.write(chunk);
-          }
-        });
+        // If no range requested, send first chunk only
+        end = Math.min(CHUNK_SIZE - 1, stats.size - 1);
       }
+
+      const chunksize = end - start + 1;
+
+      c.header("Content-Range", `bytes ${start}-${end}/${stats.size}`);
+      c.header("Accept-Ranges", "bytes");
+      c.header("Content-Length", `${chunksize}`);
+      c.header("Content-Type", file.mime || "video/x-matroska");
+      c.status(206);
+
+      return stream(c, async (stream) => {
+        const fileStream = fs.createReadStream(file.path, { start, end });
+
+        for await (const chunk of fileStream) {
+          await stream.write(chunk);
+        }
+      });
     } catch (error) {
       console.error("Streaming error:", error);
       return c.json({ success: false, message: "Streaming failed" }, 500);
