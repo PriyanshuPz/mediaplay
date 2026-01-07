@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/server.ts",
-    "start": "NODE_ENV=production bun src/server.ts",
-    "build": "NODE_ENV=production bun build src/server.ts --compile --target=bun-linux-arm64-musl --outfile=panel",
-    "build:fe": "cd fe && tsc -b && vite build",
-    "dev:fe": "cd fe && vite"
+    "build:be": "tsc",
+    "build:fe": "cd fe && tsc -b && vite build --emptyOutDir",
+    "build": "pnpm run build:be && pnpm run build:fe",
+    "dev": "tsx watch src/index.ts",
+    "dev:fe": "cd fe && vite",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -16,6 +17,7 @@
     "hono": "^4.11.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "@hono/node-server": "^1.19.6",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
@@ -30,6 +32,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
+    "tsx": "^4.7.1",
     "typescript-eslint": "^8.46.4",
     "vite": "npm:rolldown-vite@7.2.5"
   },
