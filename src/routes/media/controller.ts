@@ -189,15 +189,25 @@ class MediaAPIController {
         c.header("Content-Type", file.mime || "video/x-matroska");
         c.status(206);
 
-        const fileStream = fs.createReadStream(file.path, { start, end });
-        return c.body(fileStream as any);
+        return stream(c, async (stream) => {
+          const fileStream = fs.createReadStream(file.path, { start, end });
+
+          for await (const chunk of fileStream) {
+            await stream.write(chunk);
+          }
+        });
       } else {
         c.header("Content-Length", `${stats.size}`);
         c.header("Content-Type", file.mime || "video/x-matroska");
         c.header("Accept-Ranges", "bytes");
 
-        const fileStream = fs.createReadStream(file.path);
-        return c.body(fileStream as any);
+        return stream(c, async (stream) => {
+          const fileStream = fs.createReadStream(file.path);
+
+          for await (const chunk of fileStream) {
+            await stream.write(chunk);
+          }
+        });
       }
     } catch (error) {
       console.error("Streaming error:", error);
