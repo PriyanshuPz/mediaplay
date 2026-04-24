@@ -11,6 +11,7 @@ type Config struct {
 	DatabasePath  string
 	MediaPath     string
 	MediaMetaPath string
+	TMDBApiKey    string
 }
 
 func Load() *Config {
@@ -24,6 +25,7 @@ func Load() *Config {
 		DatabasePath:  GetEnv("DATABASE_URL", "app_data.db"),
 		MediaPath:     GetEnv("MEDIA_PATH", "./media"),
 		MediaMetaPath: GetEnv("MEDIA_META_PATH", "./media/meta"),
+		TMDBApiKey:    GetEnv("TMDB_API_KEY", ""),
 	}
 
 	return cfg

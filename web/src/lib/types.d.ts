@@ -67,3 +67,15 @@ export interface UpdateMediaInput {
   season?: number;
   episode?: number;
 }
+
+export interface ThumbnailCandidate {
+  url: string;
+  title: string;
+  year?: number;
+  source: string;
+}
+
+export interface ThumbnailCandidatesResponse {
+  current_thumbnail?: string;
+  candidates: ThumbnailCandidate[];
+}

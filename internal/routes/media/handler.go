@@ -80,8 +80,53 @@ func (h *handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	res.Success(w, data, "media fetched successfully")
 }
 
+func (h *handler) GetThumbnailCandidates(w http.ResponseWriter, r *http.Request) {
+	id, err := parseMediaID(r)
+	if err != nil {
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.service.GetThumbnailCandidates(r.Context(), id)
+	if err != nil {
+		log.Println(err)
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res.Success(w, data, "thumbnail candidates fetched successfully")
+}
+
 func (h *handler) StreamMedia(w http.ResponseWriter, r *http.Request) {
 	h.service.StreamMedia(w, r)
+}
+
+func (h *handler) SelectThumbnail(w http.ResponseWriter, r *http.Request) {
+	id, err := parseMediaID(r)
+	if err != nil {
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	input, err := res.Parse[SelectThumbnailInput](r)
+	if err != nil {
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if input.URL == "" {
+		res.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
+
+	thumbnail, err := h.service.SetThumbnailFromURL(r.Context(), id, input.URL)
+	if err != nil {
+		log.Println(err)
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res.Success(w, map[string]string{"thumbnail": thumbnail}, "thumbnail updated successfully")
 }
 
 func (h *handler) UpdateMedia(w http.ResponseWriter, r *http.Request) {

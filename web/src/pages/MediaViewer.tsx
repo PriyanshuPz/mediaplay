@@ -5,13 +5,21 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { API_ORIGIN, api, getMediaStreamUrl } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
-import type { Media, MediaType, UpdateMediaInput } from "../lib/types";
+import type {
+  Media,
+  MediaType,
+  ThumbnailCandidate,
+  UpdateMediaInput,
+} from "../lib/types";
 import {
   FaArrowLeft,
   FaCamera,
   FaFloppyDisk,
   FaListUl,
+  FaPhotoFilm,
   FaPlay,
+  FaUpload,
+  FaXmark,
 } from "react-icons/fa6";
 
 export function MediaViewer() {
@@ -27,6 +35,7 @@ export function MediaViewer() {
   const [season, setSeason] = useState("");
   const [episode, setEpisode] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [thumbnailPickerOpen, setThumbnailPickerOpen] = useState(false);
 
   const {
     data: media,
@@ -66,6 +75,25 @@ export function MediaViewer() {
     onSuccess: async ({ thumbnail: uploadedThumbnail }) => {
       setThumbnail(uploadedThumbnail);
       setFile(null);
+      setThumbnailPickerOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["media", id] });
+      await queryClient.invalidateQueries({ queryKey: ["media", "all"] });
+      await queryClient.invalidateQueries({ queryKey: ["home-feed"] });
+    },
+  });
+
+  const thumbnailCandidatesQuery = useQuery({
+    queryKey: ["thumbnail-candidates", id],
+    queryFn: () => api.getThumbnailCandidates(id!),
+    enabled: !!id && thumbnailPickerOpen,
+  });
+
+  const selectThumbnailMutation = useMutation({
+    mutationFn: (candidateUrl: string) =>
+      api.selectThumbnail(id!, candidateUrl),
+    onSuccess: async ({ thumbnail: selectedThumbnail }) => {
+      setThumbnail(selectedThumbnail);
+      setThumbnailPickerOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["media", id] });
       await queryClient.invalidateQueries({ queryKey: ["media", "all"] });
       await queryClient.invalidateQueries({ queryKey: ["home-feed"] });
@@ -374,40 +402,48 @@ export function MediaViewer() {
               </div>
             ) : null}
 
-            <Field label="Thumbnail URL">
-              <input
-                value={thumbnail}
-                onChange={(event) => setThumbnail(event.target.value)}
-                placeholder="https://... or /meta/media/..."
-                className="w-full border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-              />
-            </Field>
+            <div className="space-y-3 border border-zinc-200 bg-zinc-50 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.16em] text-zinc-600">
+                    Thumbnail
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Pick a candidate or upload a custom image.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setThumbnailPickerOpen(true)}
+                  className="inline-flex items-center gap-2 border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-50"
+                >
+                  <FaPhotoFilm className="h-3 w-3" />
+                  Change Thumbnail
+                </button>
+              </div>
 
-            <div className="space-y-2 border border-dashed border-zinc-200 bg-zinc-50 p-3">
-              <div className="flex items-center gap-2">
-                <FaCamera className="h-3.5 w-3.5 text-zinc-500" />
-                <div className="text-sm font-medium text-zinc-800">
-                  Upload thumbnail
+              <div className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
+                {previewThumbnail ? (
+                  <img
+                    src={previewThumbnail}
+                    alt={media.title}
+                    className="h-24 w-24 border border-zinc-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-24 w-24 items-center justify-center border border-dashed border-zinc-200 bg-white text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                    None
+                  </div>
+                )}
+
+                <div className="min-w-0 space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                    Current thumbnail
+                  </div>
+                  <p className="break-all text-xs leading-5 text-zinc-600">
+                    {thumbnail || "No thumbnail selected"}
+                  </p>
                 </div>
               </div>
-              <p className="text-xs leading-5 text-zinc-500">
-                Pick a file and store it in the metadata directory. The app will
-                save a browser-friendly URL automatically.
-              </p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-zinc-600 file:mr-3 file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-50 hover:file:bg-zinc-700"
-              />
-              <button
-                type="button"
-                onClick={handleUpload}
-                disabled={!file || uploadMutation.isPending}
-                className="inline-flex items-center justify-center border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {uploadMutation.isPending ? "Uploading..." : "Upload thumbnail"}
-              </button>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
@@ -423,6 +459,156 @@ export function MediaViewer() {
           </form>
         </section>
       </div>
+
+      {thumbnailPickerOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 backdrop-blur-[1px]">
+          <div className="my-3 flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col border border-zinc-200 bg-[#f5f5f2] sm:my-4 sm:max-h-[calc(100vh-2rem)]">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                  Thumbnail picker
+                </div>
+                <h2 className="mt-1 text-sm font-medium text-zinc-900">
+                  Choose or upload artwork
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setThumbnailPickerOpen(false)}
+                className="inline-flex items-center gap-2 border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900"
+              >
+                <FaXmark className="h-3 w-3" />
+                Close
+              </button>
+            </div>
+
+            <div className="grid flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+              <section className="space-y-3 border border-zinc-200 bg-white p-3">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                  Current thumbnail
+                </div>
+                {previewThumbnail ? (
+                  <img
+                    src={previewThumbnail}
+                    alt={media.title}
+                    className="aspect-square w-full border border-zinc-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square items-center justify-center border border-dashed border-zinc-200 bg-zinc-50 text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                    None selected
+                  </div>
+                )}
+                <div className="break-all text-[11px] leading-5 text-zinc-500">
+                  {thumbnail || "No thumbnail saved yet."}
+                </div>
+              </section>
+
+              <section className="space-y-4 border border-zinc-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                      Suggestions
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Select an image to download and save it immediately.
+                    </p>
+                  </div>
+                  {thumbnailCandidatesQuery.isFetching ? (
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                      Loading
+                    </div>
+                  ) : null}
+                </div>
+
+                {thumbnailCandidatesQuery.error ? (
+                  <ErrorMessage
+                    message={thumbnailCandidatesQuery.error.message}
+                  />
+                ) : null}
+
+                {thumbnailCandidatesQuery.isLoading ? <LoadingSpinner /> : null}
+
+                {!thumbnailCandidatesQuery.isLoading &&
+                (thumbnailCandidatesQuery.data?.candidates.length ?? 0) ===
+                  0 ? (
+                  <div className="border border-dashed border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                    No external thumbnails were found. Upload a custom image
+                    below.
+                  </div>
+                ) : null}
+
+                {(thumbnailCandidatesQuery.data?.candidates.length ?? 0) > 0 ? (
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {(thumbnailCandidatesQuery.data?.candidates ?? []).map(
+                      (candidate: ThumbnailCandidate) => {
+                        const isSaving = selectThumbnailMutation.isPending;
+
+                        return (
+                          <button
+                            key={candidate.url}
+                            type="button"
+                            onClick={() =>
+                              selectThumbnailMutation.mutate(candidate.url)
+                            }
+                            disabled={isSaving}
+                            className="group flex items-start gap-3 border border-zinc-200 bg-white p-2 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <img
+                              src={candidate.url}
+                              alt={candidate.title}
+                              className="h-16 w-12 shrink-0 border border-zinc-200 object-cover"
+                            />
+                            <div className="min-w-0 space-y-1">
+                              <div className="truncate text-sm font-medium text-zinc-900">
+                                {candidate.title || "Untitled"}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                                <span>{candidate.source}</span>
+                                {candidate.year ? (
+                                  <span>{candidate.year}</span>
+                                ) : null}
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-400 group-hover:text-zinc-500">
+                                Click to save
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2 border-t border-zinc-200 pt-3">
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                    <FaCamera className="h-3 w-3" />
+                    Upload custom image
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        setFile(event.target.files?.[0] ?? null)
+                      }
+                      className="block w-full text-sm text-zinc-600 file:mr-3 file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-50 hover:file:bg-zinc-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUpload}
+                      disabled={!file || uploadMutation.isPending}
+                      className="inline-flex items-center justify-center gap-2 border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FaUpload className="h-3 w-3" />
+                      {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

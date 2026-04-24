@@ -16,7 +16,22 @@ type HomeFeed struct {
 
 type MediaDetail struct {
 	db.Media
-	Episode *db.Episode `json:"episode,omitempty"`
+}
+
+type ThumbnailCandidate struct {
+	URL    string `json:"url"`
+	Title  string `json:"title"`
+	Year   *int   `json:"year,omitempty"`
+	Source string `json:"source"`
+}
+
+type ThumbnailCandidates struct {
+	CurrentThumbnail string               `json:"current_thumbnail,omitempty"`
+	Candidates       []ThumbnailCandidate `json:"candidates"`
+}
+
+type SelectThumbnailInput struct {
+	URL string `json:"url"`
 }
 
 type UpdateMediaInput struct {

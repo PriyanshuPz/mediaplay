@@ -3,6 +3,7 @@ import type {
   Media,
   MediaType,
   Stats,
+  ThumbnailCandidatesResponse,
   UpdateMediaInput,
 } from "./types";
 
@@ -68,6 +69,12 @@ export const api = {
     return apiCall(`/media/${id}`);
   },
 
+  async getThumbnailCandidates(
+    id: string,
+  ): Promise<ThumbnailCandidatesResponse> {
+    return apiCall(`/media/${id}/thumbnail-candidates`);
+  },
+
   async updateMedia(id: string, input: UpdateMediaInput): Promise<Media> {
     return apiCall(`/media/${id}`, {
       method: "PATCH",
@@ -85,6 +92,16 @@ export const api = {
     return apiCall(`/media/${id}/thumbnail`, {
       method: "POST",
       body: formData,
+    });
+  },
+
+  async selectThumbnail(
+    id: string,
+    url: string,
+  ): Promise<{ thumbnail: string }> {
+    return apiCall(`/media/${id}/thumbnail/select`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
     });
   },
 };
