@@ -3,6 +3,7 @@ import type {
   Media,
   MediaType,
   Stats,
+  ThumbnailCandidate,
   ThumbnailCandidatesResponse,
   UpdateMediaInput,
 } from "./types";
@@ -71,8 +72,15 @@ export const api = {
 
   async getThumbnailCandidates(
     id: string,
+    query?: string,
   ): Promise<ThumbnailCandidatesResponse> {
-    return apiCall(`/media/${id}/thumbnail-candidates`);
+    const params = new URLSearchParams();
+    if (query?.trim()) {
+      params.set("q", query.trim());
+    }
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return apiCall(`/media/${id}/thumbnail-candidates${suffix}`);
   },
 
   async updateMedia(id: string, input: UpdateMediaInput): Promise<Media> {
@@ -97,11 +105,16 @@ export const api = {
 
   async selectThumbnail(
     id: string,
-    url: string,
+    candidate: ThumbnailCandidate,
   ): Promise<{ thumbnail: string }> {
     return apiCall(`/media/${id}/thumbnail/select`, {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({
+        url: candidate.url,
+        title: candidate.title,
+        source: candidate.source,
+        external_id: candidate.external_id,
+      }),
     });
   },
 };

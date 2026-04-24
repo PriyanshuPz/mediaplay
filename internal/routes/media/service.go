@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -35,8 +36,8 @@ type Service interface {
 	GetHomeFeed(ctx context.Context) (HomeFeed, error)
 	ListMedia(ctx context.Context, mediaType *db.MediaType) ([]db.Media, error)
 	GetMedia(ctx context.Context, id uint) (MediaDetail, error)
-	GetThumbnailCandidates(ctx context.Context, id uint) (ThumbnailCandidates, error)
-	SetThumbnailFromURL(ctx context.Context, id uint, imageURL string) (string, error)
+	GetThumbnailCandidates(ctx context.Context, id uint, query string) (ThumbnailCandidates, error)
+	SetThumbnailFromURL(ctx context.Context, id uint, input SelectThumbnailInput) (string, error)
 	StreamMedia(w http.ResponseWriter, r *http.Request)
 	UpdateMedia(ctx context.Context, id uint, input UpdateMediaInput) error
 	UploadThumbnail(w http.ResponseWriter, r *http.Request)
@@ -72,17 +73,17 @@ func (s *service) GetStats(ctx context.Context) (Stats, error) {
 }
 
 func (s *service) GetHomeFeed(ctx context.Context) (HomeFeed, error) {
-	movies, err := gorm.G[db.Media](s.db).Limit(4).Where("type = ?", db.MediaMovie).Find(ctx)
+	movies, err := gorm.G[db.Media](s.db).Limit(12).Where("type = ?", db.MediaMovie).Find(ctx)
 
 	if err != nil {
 		return HomeFeed{}, err
 	}
-	music, err := gorm.G[db.Media](s.db).Limit(4).Where("type = ?", db.MediaMusic).Find(ctx)
+	music, err := gorm.G[db.Media](s.db).Limit(12).Where("type = ?", db.MediaMusic).Find(ctx)
 
 	if err != nil {
 		return HomeFeed{}, err
 	}
-	series, err := gorm.G[db.Media](s.db).Limit(4).Where("type = ?", db.MediaSeries).Find(ctx)
+	series, err := gorm.G[db.Media](s.db).Limit(12).Where("type = ?", db.MediaSeries).Find(ctx)
 
 	if err != nil {
 		return HomeFeed{}, err
@@ -124,7 +125,7 @@ func (s *service) GetMedia(ctx context.Context, id uint) (MediaDetail, error) {
 	return MediaDetail{Media: media}, nil
 }
 
-func (s *service) GetThumbnailCandidates(ctx context.Context, id uint) (ThumbnailCandidates, error) {
+func (s *service) GetThumbnailCandidates(ctx context.Context, id uint, query string) (ThumbnailCandidates, error) {
 	var media db.Media
 	if err := s.db.WithContext(ctx).
 		Preload("Series").
@@ -133,26 +134,38 @@ func (s *service) GetThumbnailCandidates(ctx context.Context, id uint) (Thumbnai
 		return ThumbnailCandidates{}, err
 	}
 
-	response := ThumbnailCandidates{CurrentThumbnail: media.Thumbnail}
+	searchTerm := strings.TrimSpace(query)
+	if searchTerm == "" {
+		searchTerm = media.Title
+	}
+
+	tmdbEnabled := strings.TrimSpace(s.cfg.TMDBApiKey) != ""
+	response := ThumbnailCandidates{CurrentThumbnail: media.Thumbnail, TMDBEnabled: tmdbEnabled}
 
 	switch media.Type {
 	case db.MediaMovie:
-		response.Candidates = s.tmdbCandidates(ctx, media.Title, "movie")
-	case db.MediaSeries:
-		title := media.Title
-		if media.Series != nil && media.Series.Title != "" {
-			title = media.Series.Title
+		if tmdbEnabled {
+			response.Candidates = s.tmdbCandidates(ctx, searchTerm, "movie")
 		}
-		response.Candidates = s.tmdbCandidates(ctx, title, "tv")
+	case db.MediaSeries:
+		title := searchTerm
+		if media.Series != nil && media.Series.Title != "" {
+			if strings.TrimSpace(query) == "" {
+				title = media.Series.Title
+			}
+		}
+		if tmdbEnabled {
+			response.Candidates = s.tmdbCandidates(ctx, title, "tv")
+		}
 	case db.MediaMusic:
-		response.Candidates = s.musicCandidates(ctx, media)
+		response.Candidates = s.musicCandidates(ctx, media, searchTerm)
 	}
 
 	return response, nil
 }
 
-func (s *service) SetThumbnailFromURL(ctx context.Context, id uint, imageURL string) (string, error) {
-	trimmedURL := strings.TrimSpace(imageURL)
+func (s *service) SetThumbnailFromURL(ctx context.Context, id uint, input SelectThumbnailInput) (string, error) {
+	trimmedURL := strings.TrimSpace(input.URL)
 	if trimmedURL == "" {
 		return "", fmt.Errorf("url is required")
 	}
@@ -167,7 +180,34 @@ func (s *service) SetThumbnailFromURL(ctx context.Context, id uint, imageURL str
 		return "", err
 	}
 
-	return s.persistThumbnail(ctx, id, data)
+	thumbnailURL, err := s.persistThumbnail(ctx, id, data)
+	if err != nil {
+		return "", err
+	}
+
+	updates := map[string]any{}
+	trimmedTitle := strings.TrimSpace(input.Title)
+	if trimmedTitle != "" {
+		updates["title"] = trimmedTitle
+	}
+
+	trimmedExternalID := strings.TrimSpace(input.ExternalID)
+	if trimmedExternalID != "" {
+		updates["external_id"] = trimmedExternalID
+	}
+
+	if len(updates) > 0 {
+		if err := s.db.WithContext(ctx).
+			Model(&db.Media{}).
+			Where("id = ?", id).
+			Updates(updates).Error; err != nil {
+			return "", err
+		}
+
+		go s.syncMediaMetadataSnapshot(context.Background(), id)
+	}
+
+	return thumbnailURL, nil
 }
 
 func (s *service) tmdbCandidates(ctx context.Context, title string, mediaType string) []ThumbnailCandidate {
@@ -198,6 +238,7 @@ func (s *service) tmdbCandidates(ctx context.Context, title string, mediaType st
 
 	var payload struct {
 		Results []struct {
+			ID           int    `json:"id"`
 			PosterPath   string `json:"poster_path"`
 			Title        string `json:"title"`
 			Name         string `json:"name"`
@@ -226,6 +267,9 @@ func (s *service) tmdbCandidates(ctx context.Context, title string, mediaType st
 			Title:  candidateTitle,
 			Source: "tmdb",
 		}
+		if result.ID > 0 {
+			candidate.ExternalID = fmt.Sprintf("tmdb:%s:%d", mediaType, result.ID)
+		}
 
 		if year := yearFromDate(result.ReleaseDate); year != nil {
 			candidate.Year = year
@@ -242,13 +286,17 @@ func (s *service) tmdbCandidates(ctx context.Context, title string, mediaType st
 	return candidates
 }
 
-func (s *service) musicCandidates(ctx context.Context, media db.Media) []ThumbnailCandidate {
-	if strings.TrimSpace(media.Title) == "" {
+func (s *service) musicCandidates(ctx context.Context, media db.Media, searchTerm string) []ThumbnailCandidate {
+	if strings.TrimSpace(searchTerm) == "" {
+		searchTerm = media.Title
+	}
+
+	if strings.TrimSpace(searchTerm) == "" {
 		return nil
 	}
 
 	query := url.Values{}
-	query.Set("term", media.Title)
+	query.Set("term", searchTerm)
 	query.Set("entity", "song")
 	query.Set("limit", "8")
 
@@ -270,6 +318,7 @@ func (s *service) musicCandidates(ctx context.Context, media db.Media) []Thumbna
 
 	var payload struct {
 		Results []struct {
+			TrackID       int64  `json:"trackId"`
 			TrackName     string `json:"trackName"`
 			ArtistName    string `json:"artistName"`
 			ReleaseDate   string `json:"releaseDate"`
@@ -291,6 +340,9 @@ func (s *service) musicCandidates(ctx context.Context, media db.Media) []Thumbna
 			URL:    strings.Replace(result.ArtworkURL100, "100x100bb", "600x600bb", 1),
 			Title:  strings.TrimSpace(strings.Join([]string{result.TrackName, result.ArtistName}, " - ")),
 			Source: "itunes",
+		}
+		if result.TrackID > 0 {
+			candidate.ExternalID = fmt.Sprintf("itunes:track:%d", result.TrackID)
 		}
 
 		if year := yearFromDate(result.ReleaseDate); year != nil {
@@ -376,6 +428,8 @@ func (s *service) persistThumbnail(ctx context.Context, id uint, data []byte) (s
 		return "", err
 	}
 
+	go s.syncMediaMetadataSnapshot(context.Background(), id)
+
 	return thumbnailURL, nil
 }
 
@@ -432,7 +486,7 @@ func (s *service) StreamMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) UpdateMedia(ctx context.Context, id uint, input UpdateMediaInput) error {
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
 		var media db.Media
 		if err := tx.First(&media, "id = ?", id).Error; err != nil {
@@ -535,6 +589,42 @@ func (s *service) UpdateMedia(ctx context.Context, id uint, input UpdateMediaInp
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	go s.syncMediaMetadataSnapshot(context.Background(), id)
+	return nil
+}
+
+func (s *service) syncMediaMetadataSnapshot(ctx context.Context, id uint) {
+	var media db.Media
+	if err := s.db.WithContext(ctx).First(&media, "id = ?", id).Error; err != nil {
+		return
+	}
+
+	metadata := map[string]interface{}{}
+	if len(media.Metadata) > 0 {
+		_ = json.Unmarshal(media.Metadata, &metadata)
+	}
+
+	metadata["title"] = media.Title
+	metadata["description"] = media.Description
+	metadata["type"] = media.Type
+	metadata["thumbnail"] = media.Thumbnail
+	metadata["external_id"] = media.ExternalID
+	metadata["synced_at"] = time.Now().UTC().Format(time.RFC3339)
+
+	jsonData, err := json.Marshal(metadata)
+	if err != nil {
+		return
+	}
+
+	_ = s.db.WithContext(ctx).
+		Model(&db.Media{}).
+		Where("id = ?", id).
+		Update("metadata", jsonData).Error
 }
 
 func (s *service) UploadThumbnail(w http.ResponseWriter, r *http.Request) {

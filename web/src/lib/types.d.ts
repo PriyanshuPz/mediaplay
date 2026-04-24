@@ -73,9 +73,11 @@ export interface ThumbnailCandidate {
   title: string;
   year?: number;
   source: string;
+  external_id?: string;
 }
 
 export interface ThumbnailCandidatesResponse {
   current_thumbnail?: string;
   candidates: ThumbnailCandidate[];
+  tmdb_enabled: boolean;
 }

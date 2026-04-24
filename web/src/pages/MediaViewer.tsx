@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -36,6 +36,10 @@ export function MediaViewer() {
   const [episode, setEpisode] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [thumbnailPickerOpen, setThumbnailPickerOpen] = useState(false);
+  const [thumbnailSearchInput, setThumbnailSearchInput] = useState("");
+  const [thumbnailSearchQuery, setThumbnailSearchQuery] = useState("");
+  const [hoveredCandidate, setHoveredCandidate] =
+    useState<ThumbnailCandidate | null>(null);
 
   const {
     data: media,
@@ -59,6 +63,13 @@ export function MediaViewer() {
     setSeriesName(media.series?.title ?? "");
     setSeason(media.season?.number?.toString() ?? "");
     setEpisode(media.episode?.number?.toString() ?? "");
+
+    const defaultSearch =
+      media.type === "series" && media.series?.title
+        ? media.series.title
+        : media.title;
+    setThumbnailSearchInput(defaultSearch);
+    setThumbnailSearchQuery(defaultSearch);
   }, [media]);
 
   const updateMutation = useMutation({
@@ -83,14 +94,14 @@ export function MediaViewer() {
   });
 
   const thumbnailCandidatesQuery = useQuery({
-    queryKey: ["thumbnail-candidates", id],
-    queryFn: () => api.getThumbnailCandidates(id!),
+    queryKey: ["thumbnail-candidates", id, thumbnailSearchQuery],
+    queryFn: () => api.getThumbnailCandidates(id!, thumbnailSearchQuery),
     enabled: !!id && thumbnailPickerOpen,
   });
 
   const selectThumbnailMutation = useMutation({
-    mutationFn: (candidateUrl: string) =>
-      api.selectThumbnail(id!, candidateUrl),
+    mutationFn: (candidate: ThumbnailCandidate) =>
+      api.selectThumbnail(id!, candidate),
     onSuccess: async ({ thumbnail: selectedThumbnail }) => {
       setThumbnail(selectedThumbnail);
       setThumbnailPickerOpen(false);
@@ -137,6 +148,22 @@ export function MediaViewer() {
 
     return `${API_ORIGIN}${thumbnail}`;
   }, [thumbnail]);
+
+  const compactCandidatePreview = useMemo(() => {
+    if (hoveredCandidate) {
+      return hoveredCandidate;
+    }
+
+    return thumbnailCandidatesQuery.data?.candidates[0] ?? null;
+  }, [hoveredCandidate, thumbnailCandidatesQuery.data?.candidates]);
+
+  const autoSearchEnabled = useMemo(() => {
+    if (media?.type === "music") {
+      return true;
+    }
+
+    return !!thumbnailCandidatesQuery.data?.tmdb_enabled;
+  }, [media?.type, thumbnailCandidatesQuery.data?.tmdb_enabled]);
 
   const streamUrl = useMemo(() => {
     if (!id) {
@@ -198,6 +225,16 @@ export function MediaViewer() {
     uploadMutation.mutate(file);
   };
 
+  const handleThumbnailSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!autoSearchEnabled) {
+      return;
+    }
+
+    setThumbnailSearchQuery(thumbnailSearchInput.trim());
+  };
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -236,11 +273,10 @@ export function MediaViewer() {
 
             <div className="bg-black">
               {media.type === "music" ? (
-                <audio
-                  controls
-                  preload="metadata"
+                <CustomAudioPlayer
                   src={streamUrl}
-                  className="w-full"
+                  title={media.title}
+                  subtitle={media.series?.title}
                 />
               ) : (
                 <video
@@ -501,6 +537,36 @@ export function MediaViewer() {
                 <div className="break-all text-[11px] leading-5 text-zinc-500">
                   {thumbnail || "No thumbnail saved yet."}
                 </div>
+
+                <div className="space-y-2 border-t border-zinc-200 pt-3">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                    Compact preview
+                  </div>
+                  {compactCandidatePreview ? (
+                    <div className="flex items-start gap-2 border border-zinc-200 p-2">
+                      <img
+                        src={compactCandidatePreview.url}
+                        alt={compactCandidatePreview.title}
+                        className="h-14 w-10 border border-zinc-200 object-cover"
+                      />
+                      <div className="min-w-0 space-y-1">
+                        <div className="truncate text-xs font-medium text-zinc-900">
+                          {compactCandidatePreview.title || "Untitled"}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+                          <span>{compactCandidatePreview.source}</span>
+                          {compactCandidatePreview.year ? (
+                            <span>{compactCandidatePreview.year}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-zinc-200 bg-zinc-50 px-2 py-2 text-[11px] text-zinc-500">
+                      Hover thumbnail cards to preview here.
+                    </div>
+                  )}
+                </div>
               </section>
 
               <section className="space-y-4 border border-zinc-200 bg-white p-3">
@@ -519,6 +585,40 @@ export function MediaViewer() {
                     </div>
                   ) : null}
                 </div>
+
+                <form
+                  onSubmit={handleThumbnailSearch}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                >
+                  <input
+                    value={thumbnailSearchInput}
+                    onChange={(event) =>
+                      setThumbnailSearchInput(event.target.value)
+                    }
+                    placeholder={
+                      media.type === "music"
+                        ? "Search track or artist"
+                        : "Search title"
+                    }
+                    disabled={!autoSearchEnabled}
+                    className="w-full border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!autoSearchEnabled}
+                    className="inline-flex items-center justify-center border border-zinc-900 bg-zinc-900 px-3 py-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Search
+                  </button>
+                </form>
+
+                {(media.type === "movie" || media.type === "series") &&
+                !thumbnailCandidatesQuery.data?.tmdb_enabled ? (
+                  <div className="border border-dashed border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                    TMDB search is disabled. Set TMDB_API_KEY on the backend to
+                    enable automatic movie/series thumbnails.
+                  </div>
+                ) : null}
 
                 {thumbnailCandidatesQuery.error ? (
                   <ErrorMessage
@@ -547,9 +647,16 @@ export function MediaViewer() {
                           <button
                             key={candidate.url}
                             type="button"
-                            onClick={() =>
-                              selectThumbnailMutation.mutate(candidate.url)
-                            }
+                            onClick={() => {
+                              if (candidate.title) {
+                                setTitle(candidate.title);
+                              }
+                              selectThumbnailMutation.mutate(candidate);
+                            }}
+                            onMouseEnter={() => setHoveredCandidate(candidate)}
+                            onFocus={() => setHoveredCandidate(candidate)}
+                            onMouseLeave={() => setHoveredCandidate(null)}
+                            onBlur={() => setHoveredCandidate(null)}
                             disabled={isSaving}
                             className="group flex items-start gap-3 border border-zinc-200 bg-white p-2 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
@@ -638,4 +745,122 @@ function Info({ label, value }: { label: string; value: string }) {
       </div>
     </div>
   );
+}
+
+function CustomAudioPlayer({
+  src,
+  title,
+  subtitle,
+}: {
+  src: string;
+  title: string;
+  subtitle?: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+
+    return () => {
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+    };
+  }, [src]);
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch {
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    audio.pause();
+  };
+
+  const seek = (nextTime: number) => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  };
+
+  return (
+    <div className="space-y-3 border-t border-zinc-800 bg-zinc-900 px-4 py-4 text-zinc-100">
+      <audio ref={audioRef} preload="metadata" src={src} />
+
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium">{title}</div>
+        {subtitle ? (
+          <div className="truncate text-xs uppercase tracking-[0.16em] text-zinc-400">
+            {subtitle}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="inline-flex min-w-18 items-center justify-center border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.16em] text-zinc-100"
+        >
+          {isPlaying ? "Pause" : "Play"}
+        </button>
+        <div className="text-xs text-zinc-400">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+      </div>
+
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={Math.min(currentTime, duration || 0)}
+        onChange={(event) => seek(Number(event.target.value))}
+        className="w-full accent-zinc-200"
+      />
+    </div>
+  );
+}
+
+function formatTime(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "00:00";
+  }
+
+  const totalSeconds = Math.floor(value);
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }

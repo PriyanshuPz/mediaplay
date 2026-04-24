@@ -24,6 +24,58 @@ body {
     sans-serif;
 }
 
+.ambient-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.ambient-shell::before,
+.ambient-shell::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: 38rem;
+  height: 38rem;
+  border-radius: 9999px;
+  filter: blur(56px);
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+.ambient-shell::before {
+  top: -11rem;
+  left: -9rem;
+  background: radial-gradient(
+    circle,
+    rgba(15, 23, 42, 0.16) 0%,
+    rgba(15, 23, 42, 0) 72%
+  );
+  animation: ambient-drift 18s ease-in-out infinite;
+}
+
+.ambient-shell::after {
+  right: -12rem;
+  bottom: -14rem;
+  background: radial-gradient(
+    circle,
+    rgba(24, 24, 27, 0.16) 0%,
+    rgba(24, 24, 27, 0) 72%
+  );
+  animation: ambient-drift 22s ease-in-out infinite reverse;
+}
+
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(1.2rem, -1rem, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

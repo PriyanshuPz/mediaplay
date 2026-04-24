@@ -154,6 +154,38 @@ func (j *ScanJob) upsertMedia(
 	err := j.db.Where("file_path = ?", path).First(&existing).Error
 
 	if err == nil {
+		updates := map[string]interface{}{}
+		if existing.Title != title {
+			updates["title"] = title
+		}
+		if existing.Type != mediaType {
+			updates["type"] = mediaType
+		}
+
+		if seriesID == nil {
+			if existing.SeriesID != nil {
+				updates["series_id"] = nil
+			}
+		} else if existing.SeriesID == nil || *existing.SeriesID != *seriesID {
+			updates["series_id"] = *seriesID
+		}
+
+		if seasonID == nil {
+			if existing.SeasonID != nil {
+				updates["season_id"] = nil
+			}
+		} else if existing.SeasonID == nil || *existing.SeasonID != *seasonID {
+			updates["season_id"] = *seasonID
+		}
+
+		if len(updates) > 0 {
+			if updateErr := j.db.Model(&existing).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+
+		// existing rows should still get metadata refreshed on scan runs
+		go j.fetchMetadata(existing.ID, title)
 		return nil
 	}
 
@@ -177,6 +209,13 @@ func (j *ScanJob) upsertMedia(
 	if err != nil {
 		return err
 	}
+
+	if media.ID == 0 {
+		if findErr := j.db.Where("file_path = ?", path).First(&media).Error; findErr != nil {
+			return findErr
+		}
+	}
+
 	// async metadata
 	go j.fetchMetadata(media.ID, title)
 

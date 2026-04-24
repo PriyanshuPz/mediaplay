@@ -87,7 +87,9 @@ func (h *handler) GetThumbnailCandidates(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	data, err := h.service.GetThumbnailCandidates(r.Context(), id)
+	query := r.URL.Query().Get("q")
+
+	data, err := h.service.GetThumbnailCandidates(r.Context(), id, query)
 	if err != nil {
 		log.Println(err)
 		res.Error(w, err.Error(), http.StatusBadRequest)
@@ -119,7 +121,7 @@ func (h *handler) SelectThumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thumbnail, err := h.service.SetThumbnailFromURL(r.Context(), id, input.URL)
+	thumbnail, err := h.service.SetThumbnailFromURL(r.Context(), id, input)
 	if err != nil {
 		log.Println(err)
 		res.Error(w, err.Error(), http.StatusBadRequest)

@@ -19,8 +19,10 @@ export function MediaShelf({
   actionLabel,
   actionTo,
 }: MediaShelfProps) {
+  const featuredItems = items.slice(0, 18);
+
   return (
-    <section className="space-y-2">
+    <section className="space-y-3">
       <div className="flex items-end justify-between gap-3 border-b border-zinc-200 pb-2">
         <div>
           <h2 className="text-sm font-medium uppercase tracking-[0.18em] text-zinc-700">
@@ -45,8 +47,8 @@ export function MediaShelf({
           {emptyText}
         </div>
       ) : (
-        <div className="grid gap-2">
-          {items.map((media) => (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+          {featuredItems.map((media) => (
             <MediaCard key={media.id} media={media} />
           ))}
         </div>
