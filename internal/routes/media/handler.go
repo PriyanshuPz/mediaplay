@@ -156,10 +156,6 @@ func (h *handler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	res.Success(w, res.M{}, "media deleted successfully")
 }
 
-func (h *handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
-	h.service.UploadThumbnail(w, r)
-}
-
 func parseMediaID(r *http.Request) (uint, error) {
 	idStr := chi.URLParam(r, "id")
 	id64, err := strconv.ParseUint(idStr, 10, 64)

@@ -9,6 +9,7 @@ import (
 	"mediaplay/internal/res"
 	"mediaplay/internal/routes"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +31,7 @@ func (app *application) mount() http.Handler {
 
 	r.Mount("/api", routes.Routes(app.db, app.config))
 	r.Handle("/m/*", http.StripPrefix("/m/", http.FileServer(http.Dir(app.config.MediaPath))))
-	r.Handle("/meta/*", http.StripPrefix("/meta/", http.FileServer(http.Dir(app.config.MediaMetaPath))))
+	r.Handle("/meta/*", http.StripPrefix("/meta/", http.FileServer(http.Dir(filepath.Join(app.config.MediaPath, "meta")))))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		res.Success(w, map[string]string{

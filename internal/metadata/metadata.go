@@ -144,7 +144,7 @@ func (s *Service) applyMetadata(mediaID uint, mediaPath string, best MetadataCan
 	metaJSON, _ := json.Marshal(best)
 
 	localThumb := s.metaImagePath(mediaPath)
-	thumbnailURL := filepath.ToSlash(filepath.Join("/media", "meta", mediaKey(mediaPath)+".jpg"))
+	thumbnailURL := filepath.ToSlash(filepath.Join(s.cfg.MediaPath, "meta", mediaKey(mediaPath)+".jpg"))
 
 	updates := map[string]any{
 		"metadata":    metaJSON,

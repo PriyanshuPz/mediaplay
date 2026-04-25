@@ -125,17 +125,4 @@ export const api = {
       method: "DELETE",
     });
   },
-
-  async uploadThumbnail(
-    id: string,
-    file: File,
-  ): Promise<{ thumbnail: string }> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    return apiCall(`/admin/media/${id}/thumbnail`, {
-      method: "POST",
-      body: formData,
-    });
-  },
 };

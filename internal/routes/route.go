@@ -30,7 +30,6 @@ func Routes(db *gorm.DB, cfg *config.Config) *chi.Mux {
 
 	r.Patch("/admin/media/{id}", mediaHandler.UpdateMedia)
 	r.Delete("/admin/media/{id}", mediaHandler.DeleteMedia)
-	r.Post("/admin/media/{id}/thumbnail", mediaHandler.UploadThumbnail)
 
 	return r
 }

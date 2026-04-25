@@ -7,11 +7,10 @@ import (
 )
 
 type Config struct {
-	Port          string
-	DatabasePath  string
-	MediaPath     string
-	MediaMetaPath string
-	TMDBApiKey    string
+	Port         string
+	DatabasePath string
+	MediaPath    string
+	TMDBApiKey   string
 }
 
 func Load() *Config {
@@ -21,11 +20,10 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:          GetEnv("PORT", "8000"),
-		DatabasePath:  GetEnv("DATABASE_URL", "app_data.db"),
-		MediaPath:     GetEnv("MEDIA_PATH", "./media"),
-		MediaMetaPath: GetEnv("MEDIA_META_PATH", "./media/meta"),
-		TMDBApiKey:    GetEnv("TMDB_API_KEY", ""),
+		Port:         GetEnv("PORT", "8000"),
+		DatabasePath: GetEnv("DATABASE_URL", "app_data.db"),
+		MediaPath:    GetEnv("MEDIA_PATH", "./media"),
+		TMDBApiKey:   GetEnv("TMDB_API_KEY", ""),
 	}
 
 	return cfg

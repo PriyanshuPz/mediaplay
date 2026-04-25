@@ -1,15 +1,10 @@
 package media
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"image"
 	_ "image/gif"
-	"image/jpeg"
 	_ "image/png"
-	"io"
 	"mediaplay/internal/config"
 	"mediaplay/internal/db"
 	"net/http"
@@ -41,7 +36,6 @@ type Service interface {
 	StreamMedia(w http.ResponseWriter, r *http.Request)
 	UpdateMedia(ctx context.Context, id uint, input UpdateMediaInput) error
 	DeleteMedia(ctx context.Context, id uint) error
-	UploadThumbnail(w http.ResponseWriter, r *http.Request)
 }
 
 func NewService(db *gorm.DB, cfg *config.Config) Service {
@@ -407,117 +401,17 @@ func (s *service) UpdateMedia(ctx context.Context, id uint, input UpdateMediaInp
 
 func (s *service) DeleteMedia(ctx context.Context, id uint) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Delete the media record (episodes will be cascade deleted)
 		if err := tx.Delete(&db.Media{}, "id = ?", id).Error; err != nil {
 			return err
 		}
 
-		// Clean up thumbnail if it exists locally
-		dir := filepath.Join(s.cfg.MediaMetaPath, "media", strconv.Itoa(int(id)))
+		dir := filepath.Join(s.cfg.MediaPath, "meta", strconv.Itoa(int(id)))
 		if _, err := os.Stat(dir); err == nil {
 			os.RemoveAll(dir)
 		}
 
 		return nil
 	})
-}
-
-func (s *service) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	idStr := chi.URLParam(r, "id")
-	id64, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
-		return
-	}
-	id := uint(id64)
-
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
-
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "file is required", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	data, err := io.ReadAll(io.LimitReader(file, maxThumbnailBytes+1))
-	if err != nil {
-		http.Error(w, "failed to read file", http.StatusInternalServerError)
-		return
-	}
-	if len(data) > maxThumbnailBytes {
-		http.Error(w, "image is too large", http.StatusBadRequest)
-		return
-	}
-
-	thumbnailURL, err := s.persistThumbnail(ctx, id, data)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"thumbnail": thumbnailURL,
-	})
-}
-
-func (s *service) persistThumbnail(ctx context.Context, id uint, data []byte) (string, error) {
-	if len(data) == 0 {
-		return "", fmt.Errorf("image is required")
-	}
-
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return "", fmt.Errorf("invalid image")
-	}
-
-	dir := filepath.Join(s.cfg.MediaMetaPath, "media", strconv.Itoa(int(id)))
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-
-	finalPath := filepath.Join(dir, "cover.jpg")
-	tempFile, err := os.CreateTemp(dir, "cover-*.jpg")
-	if err != nil {
-		return "", err
-	}
-	tempName := tempFile.Name()
-
-	if err := jpeg.Encode(tempFile, img, &jpeg.Options{Quality: 90}); err != nil {
-		tempFile.Close()
-		os.Remove(tempName)
-		return "", err
-	}
-
-	if err := tempFile.Close(); err != nil {
-		os.Remove(tempName)
-		return "", err
-	}
-
-	if err := os.Rename(tempName, finalPath); err != nil {
-		os.Remove(tempName)
-		return "", err
-	}
-
-	thumbnailURL := filepath.ToSlash(filepath.Join("/meta", "media", strconv.Itoa(int(id)), "cover.jpg"))
-	if err := s.db.WithContext(ctx).
-		Model(&db.Media{}).
-		Where("id = ?", id).
-		Update("thumbnail", thumbnailURL).Error; err != nil {
-		return "", err
-	}
-
-	go s.syncMediaMetadataSnapshot(context.Background(), id)
-
-	return thumbnailURL, nil
 }
 
 func (s *service) syncMediaMetadataSnapshot(ctx context.Context, id uint) {
