@@ -27,7 +27,6 @@ jobs:
           - os: linux
             arch: arm
             variant: v7
-
           - os: windows
             arch: amd64
           - os: windows
@@ -43,7 +42,8 @@ jobs:
 
       - name: Build binary
         run: |
-          mkdir -p dist
+          rm -rf dist artifacts
+          mkdir -p dist artifacts
 
           docker buildx build \
             --platform=linux/amd64 \
@@ -55,7 +55,7 @@ jobs:
 
       - name: Rename binary
         run: |
-          mkdir -p artifacts
+          FILE=$(find dist -type f | head -n 1)
 
           NAME="mediaplay-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}"
           if [ "${{ matrix.variant }}" != "" ]; then
@@ -63,9 +63,9 @@ jobs:
           fi
 
           if [ "${{ matrix.os }}" = "windows" ]; then
-            mv dist/out/* "artifacts/${NAME}.exe"
+            mv "$FILE" "artifacts/${NAME}.exe"
           else
-            mv dist/out/* "artifacts/${NAME}"
+            mv "$FILE" "artifacts/${NAME}"
           fi
 
       - uses: actions/upload-artifact@v4
@@ -76,6 +76,9 @@ jobs:
   release:
     needs: build-binaries
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/download-artifact@v4
@@ -95,6 +98,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -117,4 +121,8 @@ jobs:
             --build-arg VERSION=${VERSION} \
             -t ${IMAGE_NAME}:latest \
             -t ${IMAGE_NAME}:${VERSION} \
+            --provenance=true \
+            --sbom=true \
+            --attest type=provenance,mode=max \
+            --attest type=sbom \
             --push .
