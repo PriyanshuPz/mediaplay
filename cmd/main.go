@@ -37,14 +37,13 @@ func main() {
 	)
 
 	workerManager := worker.NewManager(logger)
-	scanJob := worker.NewScanJob(db, cfg.MediaPath, logger)
+	scanJob := worker.NewScanJob(db, cfg, logger)
 
 	if err := workerManager.Register(scanJob); err != nil {
 		logger.Error("failed to register scan job", "error", err)
 	}
 
 	workerManager.Start()
-	// trigger initial scan
 	go scanJob.Run(context.Background())
 	defer worker.StopWithTimeout(workerManager, 300)
 

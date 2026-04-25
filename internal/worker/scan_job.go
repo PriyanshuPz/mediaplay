@@ -2,10 +2,11 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"io/fs"
 	"log/slog"
+	"mediaplay/internal/config"
 	"mediaplay/internal/db"
+	"mediaplay/internal/metadata"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,17 +18,34 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type ScanJob struct {
-	db        *gorm.DB
-	logger    *slog.Logger
-	mediaRoot string
+var videoExt = map[string]struct{}{
+	".mp4": {}, ".mkv": {}, ".avi": {}, ".mov": {}, ".wmv": {},
+	".flv": {}, ".webm": {}, ".m4v": {}, ".mpeg": {}, ".mpg": {},
+	".3gp": {}, ".ts": {}, ".vob": {},
 }
 
-func NewScanJob(db *gorm.DB, mediaRoot string, logger *slog.Logger) *ScanJob {
+var audioExt = map[string]struct{}{
+	".mp3": {}, ".flac": {}, ".wav": {}, ".aac": {}, ".ogg": {},
+	".m4a": {}, ".wma": {}, ".alac": {}, ".aiff": {},
+}
+
+var subtitleExt = map[string]struct{}{
+	".srt": {}, ".ass": {}, ".vtt": {}, ".sub": {},
+}
+
+type ScanJob struct {
+	db      *gorm.DB
+	logger  *slog.Logger
+	cfg     *config.Config
+	metaSvc *metadata.Service
+}
+
+func NewScanJob(db *gorm.DB, cfg *config.Config, logger *slog.Logger) *ScanJob {
 	return &ScanJob{
-		db:        db,
-		logger:    logger,
-		mediaRoot: mediaRoot,
+		db:      db,
+		logger:  logger,
+		cfg:     cfg,
+		metaSvc: metadata.NewService(db, cfg),
 	}
 }
 
@@ -48,7 +66,7 @@ func (j *ScanJob) Run(ctx context.Context) error {
 	}
 	defer running.Store(false)
 
-	return filepath.WalkDir(j.mediaRoot, func(path string, d fs.DirEntry, err error) error {
+	return filepath.WalkDir(j.cfg.MediaPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
@@ -57,7 +75,7 @@ func (j *ScanJob) Run(ctx context.Context) error {
 			return nil
 		}
 
-		rel, _ := filepath.Rel(j.mediaRoot, path)
+		rel, _ := filepath.Rel(j.cfg.MediaPath, path)
 		parts := strings.Split(rel, string(os.PathSeparator))
 
 		if len(parts) == 0 {
@@ -241,21 +259,6 @@ func extractSeasonNumber(name string) int {
 	return 1
 }
 
-var videoExt = map[string]struct{}{
-	".mp4": {}, ".mkv": {}, ".avi": {}, ".mov": {}, ".wmv": {},
-	".flv": {}, ".webm": {}, ".m4v": {}, ".mpeg": {}, ".mpg": {},
-	".3gp": {}, ".ts": {}, ".vob": {},
-}
-
-var audioExt = map[string]struct{}{
-	".mp3": {}, ".flac": {}, ".wav": {}, ".aac": {}, ".ogg": {},
-	".m4a": {}, ".wma": {}, ".alac": {}, ".aiff": {},
-}
-
-var subtitleExt = map[string]struct{}{
-	".srt": {}, ".ass": {}, ".vtt": {}, ".sub": {},
-}
-
 func isMediaFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 
@@ -269,18 +272,12 @@ func isMediaFile(path string) bool {
 	return false
 }
 
-func (j *ScanJob) fetchMetadata(mediaID uint, title string) {
+func (j *ScanJob) fetchMetadata(mediaID uint, _ string) {
+	ctx := context.Background()
 
-	meta := map[string]interface{}{
-		"title":   title,
-		"fetched": true,
+	if err := j.metaSvc.AutoFetch(ctx, mediaID); err != nil {
+		j.logger.Warn("metadata fetch failed", "media_id", mediaID, "err", err)
 	}
-
-	jsonData, _ := json.Marshal(meta)
-
-	j.db.Model(&db.Media{}).
-		Where("id = ?", mediaID).
-		Update("metadata", jsonData)
 }
 
 func guessSeriesInfo(path string) (seriesName string, season int, ok bool) {
@@ -301,32 +298,28 @@ func guessSeriesInfo(path string) (seriesName string, season int, ok bool) {
 }
 
 func extractTitle(filename string) string {
-	// Normalize separators to spaces
+	base := filepath.Base(filename)
+	filename = strings.TrimSuffix(base, filepath.Ext(base))
 	reSeparators := regexp.MustCompile(`[._-]+`)
 	name := reSeparators.ReplaceAllString(filename, " ")
 
-	// Remove years (1900–2099)
 	reYear := regexp.MustCompile(`\b(19|20)\d{2}\b`)
 	name = reYear.ReplaceAllString(name, "")
 
-	// Noise words to remove
 	noiseWords := []string{
 		"official", "trailer", "teaser", "4k", "ultra", "hd", "60fps",
 		"new", "hindi", "dubbed", "sony", "pictures",
 	}
 
-	// Remove noise words (case-insensitive)
 	for _, word := range noiseWords {
 		re := regexp.MustCompile(`(?i)\b` + word + `\b`)
 		name = re.ReplaceAllString(name, "")
 	}
 
-	// Collapse multiple spaces
 	reSpaces := regexp.MustCompile(`\s+`)
 	name = reSpaces.ReplaceAllString(name, " ")
 
 	name = strings.TrimSpace(name)
 
-	// Title case (basic)
 	return strings.Title(strings.ToLower(name))
 }

@@ -2,8 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Layout } from "./components/Layout";
 import { Home } from "./pages/Home.tsx";
-import { ManageMedia } from "./pages/ManageMedia.tsx";
-import { MediaViewer } from "./pages/MediaViewer.tsx";
+import { MediaDetail } from "./pages/MediaDetail.tsx";
+import { AdminPage } from "./pages/AdminPage.tsx";
 import { Movies } from "./pages/Movies.tsx";
 import { Music } from "./pages/Music.tsx";
 import { Series } from "./pages/Series.tsx";
@@ -25,11 +25,11 @@ function App() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
-            <Route path="manage/media" element={<ManageMedia />} />
+            <Route path="admin" element={<AdminPage />} />
             <Route path="movies" element={<Movies />} />
             <Route path="music" element={<Music />} />
             <Route path="series" element={<Series />} />
-            <Route path="media/:id" element={<MediaViewer />} />
+            <Route path="media/:id" element={<MediaDetail />} />
           </Route>
         </Routes>
       </BrowserRouter>

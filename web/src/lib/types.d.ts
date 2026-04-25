@@ -68,16 +68,21 @@ export interface UpdateMediaInput {
   episode?: number;
 }
 
-export interface ThumbnailCandidate {
+export interface MetadataCandidate {
   url: string;
   title: string;
+  original_title?: string;
   year?: number;
+  overview?: string;
+  popularity?: number;
+  score?: number;
+  artist?: string;
   source: string;
   external_id?: string;
+  media_type?: string;
 }
 
-export interface ThumbnailCandidatesResponse {
-  current_thumbnail?: string;
-  candidates: ThumbnailCandidate[];
+export interface MetadataCandidatesResponse {
+  candidates: MetadataCandidate[];
   tmdb_enabled: boolean;
 }

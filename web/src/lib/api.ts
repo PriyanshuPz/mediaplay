@@ -3,8 +3,8 @@ import type {
   Media,
   MediaType,
   Stats,
-  ThumbnailCandidate,
-  ThumbnailCandidatesResponse,
+  MetadataCandidate,
+  MetadataCandidatesResponse,
   UpdateMediaInput,
 } from "./types";
 
@@ -70,23 +70,49 @@ export const api = {
     return apiCall(`/media/${id}`);
   },
 
-  async getThumbnailCandidates(
+  async getMetadataCandidates(
     id: string,
     query?: string,
-  ): Promise<ThumbnailCandidatesResponse> {
+  ): Promise<MetadataCandidatesResponse> {
     const params = new URLSearchParams();
     if (query?.trim()) {
       params.set("q", query.trim());
     }
 
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    return apiCall(`/media/${id}/thumbnail-candidates${suffix}`);
+    return apiCall(`/meta/${id}/candidates${suffix}`);
+  },
+
+  async refreshMetadata(id: string, query?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (query?.trim()) {
+      params.set("q", query.trim());
+    }
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return apiCall(`/meta/${id}/refresh${suffix}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async updateMetadata(id: string, input: MetadataCandidate): Promise<void> {
+    return apiCall(`/meta/${id}/update`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   },
 
   async updateMedia(id: string, input: UpdateMediaInput): Promise<Media> {
-    return apiCall(`/media/${id}`, {
+    return apiCall(`/admin/media/${id}`, {
       method: "PATCH",
       body: JSON.stringify(input),
+    });
+  },
+
+  async deleteMedia(id: string): Promise<void> {
+    return apiCall(`/admin/media/${id}`, {
+      method: "DELETE",
     });
   },
 
@@ -97,24 +123,9 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
 
-    return apiCall(`/media/${id}/thumbnail`, {
+    return apiCall(`/admin/media/${id}/thumbnail`, {
       method: "POST",
       body: formData,
-    });
-  },
-
-  async selectThumbnail(
-    id: string,
-    candidate: ThumbnailCandidate,
-  ): Promise<{ thumbnail: string }> {
-    return apiCall(`/media/${id}/thumbnail/select`, {
-      method: "POST",
-      body: JSON.stringify({
-        url: candidate.url,
-        title: candidate.title,
-        source: candidate.source,
-        external_id: candidate.external_id,
-      }),
     });
   },
 };

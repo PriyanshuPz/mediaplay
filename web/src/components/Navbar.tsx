@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { FaFilm, FaHouse, FaMusic, FaPenNib, FaBars } from "react-icons/fa6";
+import { FaFilm, FaHouse, FaMusic, FaGear, FaBars } from "react-icons/fa6";
+import type { ReactNode } from "react";
 
 export function Navbar() {
   return (
@@ -36,9 +37,9 @@ export function Navbar() {
             icon={<FaBars className="h-3.5 w-3.5" />}
           />
           <NavLink
-            to="/manage/media"
-            label="Library"
-            icon={<FaPenNib className="h-3.5 w-3.5" />}
+            to="/admin"
+            label="Admin"
+            icon={<FaGear className="h-3.5 w-3.5" />}
             accent
           />
         </div>
@@ -55,7 +56,7 @@ function NavLink({
 }: {
   to: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   accent?: boolean;
 }) {
   const baseClassName = accent

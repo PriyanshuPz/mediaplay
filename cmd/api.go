@@ -27,7 +27,8 @@ func (app *application) mount() http.Handler {
 
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	r.Mount("/api", routes.Routes(app.db, *app.config))
+	r.Mount("/api", routes.Routes(app.db, app.config))
+	r.Handle("/media/*", http.StripPrefix("/media/", http.FileServer(http.Dir(app.config.MediaPath))))
 	r.Handle("/meta/*", http.StripPrefix("/meta/", http.FileServer(http.Dir(app.config.MediaMetaPath))))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
