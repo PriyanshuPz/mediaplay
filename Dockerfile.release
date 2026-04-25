@@ -1,0 +1,12 @@
+FROM alpine:3.22
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates tzdata
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+COPY mediaplay-linux-${TARGETARCH}${TARGETVARIANT:+-${TARGETVARIANT}} /usr/local/bin/mediaplay
+
+ENTRYPOINT ["/usr/local/bin/mediaplay"]
