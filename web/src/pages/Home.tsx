@@ -31,57 +31,57 @@ export function Home() {
 
   return (
     <div className="space-y-6">
-      <section className="border border-zinc-200 bg-white px-4 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-1">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-              MediaPlay
-            </div>
-            <h1 className="text-lg font-medium text-zinc-900">
-              Compact library overview
-            </h1>
-            <p className="text-sm text-zinc-500">
-              Browse media, adjust metadata, and replace thumbnails.
-            </p>
+      <section className="rounded-lg border bg-card px-4 py-4">
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            MediaPlay
           </div>
+          <h1 className="text-lg font-semibold text-foreground">
+            Your Library
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Browse, fix metadata, and manage your collection.
+          </p>
         </div>
       </section>
 
-      {loadingStats ? <LoadingSpinner /> : null}
-
-      {stats ? (
-        <div className="grid gap-2 border border-zinc-200 bg-white sm:grid-cols-3">
+      {/* Stats */}
+      {loadingStats ? (
+        <LoadingSpinner />
+      ) : stats ? (
+        <div className="grid gap-3 sm:grid-cols-3">
           <StatsCard label="Movies" count={stats.movies} />
           <StatsCard label="Music" count={stats.music} />
           <StatsCard label="Series" count={stats.series} />
         </div>
       ) : null}
 
-      {loadingFeed ? <LoadingSpinner /> : null}
-
-      {homeFeed ? (
+      {/* Feed */}
+      {loadingFeed ? (
+        <LoadingSpinner />
+      ) : homeFeed ? (
         <div className="space-y-8">
           <MediaShelf
             title="Fresh movies"
-            description="Recent movie entries in the catalog."
+            description="Recently added movies"
             items={homeFeed.movies}
-            emptyText="No movies have been indexed yet."
+            emptyText="No movies found"
             actionLabel="All movies"
             actionTo="/movies"
           />
           <MediaShelf
             title="Music"
-            description="Albums, tracks, and other music entries."
+            description="Tracks and albums"
             items={homeFeed.music}
-            emptyText="No music has been indexed yet."
+            emptyText="No music found"
             actionLabel="All music"
             actionTo="/music"
           />
           <MediaShelf
             title="Series"
-            description="Shows and seasons waiting for edits."
+            description="Shows and seasons"
             items={homeFeed.series}
-            emptyText="No series have been indexed yet."
+            emptyText="No series found"
             actionLabel="All series"
             actionTo="/series"
           />
@@ -93,11 +93,11 @@ export function Home() {
 
 function StatsCard({ label, count }: { label: string; count: number }) {
   return (
-    <div className="border-r border-zinc-200 p-3 last:border-r-0 sm:p-4">
-      <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+    <div className="rounded-lg border bg-card p-4">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-xl font-medium text-zinc-900">{count}</div>
+      <div className="mt-1 text-xl font-semibold text-foreground">{count}</div>
     </div>
   );
 }

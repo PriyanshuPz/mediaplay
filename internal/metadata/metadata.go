@@ -146,7 +146,7 @@ func (s *Service) applyMetadata(mediaID uint, mediaPath string, best MetadataCan
 	localThumb := s.metaImagePath(mediaPath)
 	thumbnailURL := filepath.ToSlash(filepath.Join("/media", "meta", mediaKey(mediaPath)+".jpg"))
 
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"metadata":    metaJSON,
 		"external_id": best.ExternalID,
 	}
@@ -163,6 +163,11 @@ func (s *Service) applyMetadata(mediaID uint, mediaPath string, best MetadataCan
 
 	if IsBetterTitle("", best.Title) {
 		updates["title"] = best.Title
+	}
+
+	if best.Artist != "" {
+		updates["description"] = best.Artist
+
 	}
 
 	s.db.Model(&db.Media{}).

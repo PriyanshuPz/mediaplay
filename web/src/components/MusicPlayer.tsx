@@ -1,282 +1,292 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   FaPlay,
   FaPause,
-  FaVolumeHigh,
   FaBackward,
   FaForward,
+  FaVolumeHigh,
   FaListUl,
 } from "react-icons/fa6";
 import { FaVolumeMute } from "react-icons/fa";
+import { api, getMediaStreamUrl, API_ORIGIN } from "../lib/api";
 import type { Media } from "../lib/types";
-import { API_ORIGIN, getMediaStreamUrl } from "../lib/api";
+import { formatTime } from "../lib/utls";
+import { BiArrowBack } from "react-icons/bi";
 
-interface MusicPlayerProps {
-  tracks: Media[];
-  initialTrackIndex?: number;
-  onTrackChange?: (trackId: number) => void;
-}
-
-export function MusicPlayer({
-  tracks,
-  initialTrackIndex = 0,
-  onTrackChange,
-}: MusicPlayerProps) {
+export function MusicPlayer() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(() => {
-    if (tracks.length === 0) {
-      return 0;
-    }
 
-    return Math.max(0, Math.min(initialTrackIndex, tracks.length - 1));
-  });
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
 
-  const currentTrack = tracks[currentTrackIndex];
+  const { data: media } = useQuery({
+    queryKey: ["media", id],
+    queryFn: () => api.getMediaById(id!),
+    enabled: !!id,
+  });
 
+  const { data: playlist = [] } = useQuery({
+    queryKey: ["playlist", media?.type, media?.series_id],
+    queryFn: async () => {
+      if (!media) return [];
+
+      if (media.type === "music") {
+        return api.listMedia("music");
+      }
+
+      if (media.type === "series") {
+        const items = await api.listMedia("series");
+        return media.series_id
+          ? items.filter((i) => i.series_id === media.series_id)
+          : items;
+      }
+
+      return [];
+    },
+    enabled: !!media,
+  });
+
+  const currentTrack = playlist[currentIndex];
+
+  // --- sync index with route ---
+  useEffect(() => {
+    if (!playlist.length || !id) return;
+
+    const index = playlist.findIndex((t) => t.id.toString() === id);
+    setCurrentIndex(index >= 0 ? index : 0);
+  }, [playlist, id]);
+
+  // --- bind audio events (IMPORTANT: depends on currentTrack) ---
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTime = () => setTime(audio.currentTime);
+    const onMeta = () => setDuration(audio.duration || 0);
+    const onEnd = () => next();
+
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
+
+    return () => {
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
+    };
+  }, [currentTrack]); // ✅ FIX
+
+  // --- load + play track ---
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => playNext();
+    const url = getMediaStreamUrl(currentTrack.id.toString());
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
-    audio.addEventListener("ended", handleEnded);
+    audio.src = url;
+    audio.load();
 
-    return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      audio.removeEventListener("ended", handleEnded);
+    // fallback: ensure duration is set
+    audio.onloadedmetadata = () => {
+      setDuration(audio.duration || 0);
     };
+
+    audio.play().catch((e) => {
+      console.warn("Playback failed:", e);
+    });
+
+    navigate(`/listen/${currentTrack.id}`, { replace: true });
+
+    setTime(0);
   }, [currentTrack]);
 
-  const getThumbnail = (track: Media) => {
-    if (!track.thumbnail) return "";
-    if (track.thumbnail.startsWith("http")) return track.thumbnail;
-    return `${API_ORIGIN}${track.thumbnail}`;
+  // --- controls ---
+  const togglePlay = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.paused ? a.play() : a.pause();
   };
 
-  const handlePlayPause = () => {
+  const next = () => {
+    setCurrentIndex((i) => (i + 1) % playlist.length);
+  };
+
+  const prev = () => {
+    setCurrentIndex((i) => (i - 1 + playlist.length) % playlist.length);
+  };
+
+  const seek = (v: number) => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+      audioRef.current.currentTime = v;
     }
+    setTime(v);
   };
 
-  const playNext = () => {
-    if (tracks.length === 0) {
-      return;
-    }
+  const changeVolume = (v: number) => {
+    if (!audioRef.current) return;
 
-    const nextIndex = (currentTrackIndex + 1) % tracks.length;
-    setCurrentTrackIndex(nextIndex);
-    onTrackChange?.(tracks[nextIndex].id);
+    audioRef.current.volume = v;
+    setVolume(v);
+
+    if (v > 0) setMuted(false);
   };
 
-  const playPrevious = () => {
-    if (tracks.length === 0) {
-      return;
-    }
+  const toggleMute = () => {
+    if (!audioRef.current) return;
 
-    const prevIndex = (currentTrackIndex - 1 + tracks.length) % tracks.length;
-    setCurrentTrackIndex(prevIndex);
-    onTrackChange?.(tracks[prevIndex].id);
-  };
-
-  const playTrack = (index: number) => {
-    setCurrentTrackIndex(index);
-    onTrackChange?.(tracks[index].id);
-    setShowPlaylist(false);
-  };
-
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
-    if (newVolume > 0 && isMuted) {
-      setIsMuted(false);
-    }
-  };
-
-  const handleToggleMute = () => {
-    if (isMuted) {
-      handleVolumeChange(volume || 0.5);
+    if (muted) {
+      audioRef.current.volume = volume || 0.5;
+      setMuted(false);
     } else {
-      setIsMuted(true);
-      if (audioRef.current) {
-        audioRef.current.volume = 0;
-      }
+      audioRef.current.volume = 0;
+      setMuted(true);
     }
   };
 
-  const handleProgressChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
-  };
+  const getThumb = (t: Media) =>
+    t.thumbnail?.startsWith("http")
+      ? t.thumbnail
+      : `${API_ORIGIN}${t.thumbnail}`;
 
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds)) return "0:00";
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
+  if (!currentTrack) {
+    return (
+      <div className="h-screen flex items-center justify-center text-muted-foreground">
+        Loading player...
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden">
-      {currentTrack && (
-        <>
-          <audio
-            ref={audioRef}
-            src={getMediaStreamUrl(currentTrack.id.toString())}
-            crossOrigin="anonymous"
-          />
+    <div className="h-screen bg-background flex flex-col">
+      <audio ref={audioRef} />
 
-          <div className="p-6">
-            {/* Album art */}
-            <div className="mb-6 flex justify-center">
-              <img
-                src={getThumbnail(currentTrack) || "/placeholder-album.png"}
-                alt={currentTrack.title}
-                className="w-48 h-48 rounded-lg shadow-lg object-cover"
-              />
-            </div>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <BiArrowBack />
+        </button>
+        <span className="text-sm text-foreground truncate">
+          {currentTrack.title}
+        </span>
+      </div>
 
-            {/* Track info */}
-            <div className="mb-6 text-center">
-              <h3 className="text-2xl font-bold text-zinc-900 mb-1">
-                {currentTrack.title}
-              </h3>
-              {currentTrack.description && (
-                <p className="text-sm text-zinc-600">
-                  {currentTrack.description}
-                </p>
-              )}
-            </div>
+      <div className="flex-1 flex flex-col items-center justify-between px-4 py-6">
+        <div className="flex flex-col items-center text-center gap-4 mt-4">
+          <div className="w-64 h-64 md:w-80 md:h-80">
+            <img
+              src={getThumb(currentTrack) || "/placeholder.png"}
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-            {/* Progress bar */}
-            <div className="mb-4">
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                value={currentTime}
-                onChange={handleProgressChange}
-                className="w-full h-2 bg-zinc-200 rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-500 [&::-moz-range-thumb]:border-0"
-              />
-              <div className="flex justify-between text-xs text-zinc-600 mt-1">
-                <span>{formatTime(currentTime)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
-            </div>
+          <div>
+            <h2 className="text-base text-foreground">{currentTrack.title}</h2>
+            <p className="text-sm text-muted-foreground">
+              {currentTrack.description || "Unknown"}
+            </p>
+          </div>
+        </div>
+        <div className="w-full max-w-md flex flex-col gap-4">
+          <div>
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              value={time}
+              onChange={(e) => seek(Number(e.target.value))}
+              className="w-full h-5 bg-muted"
+            />
 
-            {/* Controls */}
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <button
-                onClick={playPrevious}
-                className="p-3 rounded-full hover:bg-zinc-100 transition-colors text-zinc-700"
-              >
-                <FaBackward size={20} />
-              </button>
-
-              <button
-                onClick={handlePlayPause}
-                className="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center text-white shadow-lg"
-              >
-                {isPlaying ? (
-                  <FaPause size={28} />
-                ) : (
-                  <FaPlay size={28} className="ml-1" />
-                )}
-              </button>
-
-              <button
-                onClick={playNext}
-                className="p-3 rounded-full hover:bg-zinc-100 transition-colors text-zinc-700"
-              >
-                <FaForward size={20} />
-              </button>
-            </div>
-
-            {/* Volume and playlist */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                <button
-                  onClick={handleToggleMute}
-                  className="p-2 text-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  {isMuted ? (
-                    <FaVolumeMute size={20} />
-                  ) : (
-                    <FaVolumeHigh size={20} />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) =>
-                    handleVolumeChange(parseFloat(e.target.value))
-                  }
-                  className="flex-1 h-2 bg-zinc-200 rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-500 [&::-moz-range-thumb]:border-0"
-                />
-              </div>
-
-              <button
-                onClick={() => setShowPlaylist(!showPlaylist)}
-                className="p-2 text-zinc-600 hover:text-zinc-900 transition-colors ml-4"
-              >
-                <FaListUl size={20} />
-              </button>
+            <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
+              <span>{formatTime(time)}</span>
+              <span>{formatTime(duration)}</span>
             </div>
           </div>
 
-          {/* Playlist */}
-          {showPlaylist && (
-            <div className="border-t border-zinc-200 max-h-96 overflow-y-auto">
-              {tracks.map((track, index) => (
-                <button
-                  key={track.id}
-                  onClick={() => playTrack(index)}
-                  className={`w-full text-left px-6 py-3 border-b border-zinc-100 hover:bg-zinc-50 transition-colors ${
-                    index === currentTrackIndex ? "bg-blue-50" : ""
-                  }`}
-                >
-                  <p
-                    className={`font-medium ${
-                      index === currentTrackIndex
-                        ? "text-blue-600"
-                        : "text-zinc-900"
-                    }`}
-                  >
-                    {track.title}
-                  </p>
-                  {track.description && (
-                    <p className="text-xs text-zinc-600">{track.description}</p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
+          <div className="flex items-center justify-center gap-8">
+            <button
+              onClick={prev}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <FaBackward size={18} />
+            </button>
+
+            <button
+              onClick={togglePlay}
+              className="text-foreground hover:text-primary"
+            >
+              {isPlaying ? <FaPause size={28} /> : <FaPlay size={28} />}
+            </button>
+
+            <button
+              onClick={next}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <FaForward size={18} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleMute}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {muted ? <FaVolumeMute /> : <FaVolumeHigh />}
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.1}
+              value={muted ? 0 : volume}
+              onChange={(e) => changeVolume(Number(e.target.value))}
+              className="flex-1 h-5 bg-muted"
+            />
+
+            <button
+              onClick={() => setShowPlaylist(!showPlaylist)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <FaListUl />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showPlaylist && (
+        <div className="border-t border-border bg-background max-h-64 overflow-y-auto">
+          {playlist.map((t, i) => (
+            <button
+              key={t.id}
+              onClick={() => setCurrentIndex(i)}
+              className={`w-full text-left px-4 py-3 text-sm ${
+                i === currentIndex
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.title}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

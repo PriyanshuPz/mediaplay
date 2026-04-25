@@ -7,13 +7,15 @@ import { AdminPage } from "./pages/AdminPage.tsx";
 import { Movies } from "./pages/Movies.tsx";
 import { Music } from "./pages/Music.tsx";
 import { Series } from "./pages/Series.tsx";
+import { PlayerPage } from "./pages/PlayerPage.tsx";
+import { MusicPlayer } from "./components/MusicPlayer.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
@@ -31,6 +33,8 @@ function App() {
             <Route path="series" element={<Series />} />
             <Route path="media/:id" element={<MediaDetail />} />
           </Route>
+          <Route path="/player/:id" element={<PlayerPage />} />
+          <Route path="/listen/:id" element={<MusicPlayer />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

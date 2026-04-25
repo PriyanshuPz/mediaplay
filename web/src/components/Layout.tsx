@@ -1,13 +1,28 @@
+import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import { Navbar } from "./Navbar";
+import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
 
 export function Layout() {
+  const [open, setOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   return (
-    <div className="ambient-shell min-h-screen bg-[#f5f5f2] text-zinc-900">
-      <Navbar />
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 lg:px-6">
-        <Outlet />
-      </main>
+    <div className="flex h-screen bg-background text-foreground">
+      <Sidebar open={open} setOpen={setOpen} />
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Topbar onMenuClick={() => setOpen(true)} />
+        <main className="flex-1 overflow-y-auto px-4 py-4">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

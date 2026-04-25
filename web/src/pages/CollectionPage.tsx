@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import type { MediaType } from "../lib/types";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { MediaShelf } from "../components/MediaShelf";
+import { MediaCard } from "../components/MediaCard";
 
 interface CollectionPageProps {
   type: MediaType;
@@ -22,27 +22,34 @@ export function CollectionPage({
   });
 
   return (
-    <div className="space-y-4">
-      <section className="border border-zinc-200 bg-white px-4 py-3">
+    <div className="space-y-6">
+      <section className="rounded-lg border bg-card px-4 py-4">
         <div className="space-y-1">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
             Collection
           </div>
-          <h1 className="text-lg font-medium text-zinc-900">{title}</h1>
-          <p className="text-sm text-zinc-500">{description}</p>
+          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </section>
 
-      {error ? <ErrorMessage message={error.message} /> : null}
-      {isLoading ? <LoadingSpinner /> : null}
-      {data ? (
-        <MediaShelf
-          title={title}
-          description={description}
-          items={data}
-          emptyText={`No ${title.toLowerCase()} have been indexed yet.`}
-        />
-      ) : null}
+      {error && <ErrorMessage message={error.message} />}
+      {isLoading && <LoadingSpinner />}
+
+      {data && data.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+          {data.map((media) => (
+            <MediaCard key={media.id} media={media} />
+          ))}
+        </div>
+      )}
+
+      {/* Empty */}
+      {data && data.length === 0 && (
+        <div className="rounded-md border border-dashed bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+          No {title.toLowerCase()} found.
+        </div>
+      )}
     </div>
   );
 }
