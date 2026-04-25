@@ -116,7 +116,6 @@ func looksLikeTitle(name string) bool {
 func (j *ScanJob) handleMovie(ctx context.Context, path string, parts []string) error {
 	title := extractTitle(path)
 
-	// try folder as hint (only if useful)
 	if len(parts) >= 2 {
 		folder := parts[len(parts)-2]
 
@@ -202,8 +201,9 @@ func (j *ScanJob) upsertMedia(
 			}
 		}
 
-		// existing rows should still get metadata refreshed on scan runs
-		go j.fetchMetadata(existing.ID, title)
+		if len(existing.Metadata) == 0 && existing.ExternalID == "" {
+			go j.fetchMetadata(existing.ID, title)
+		}
 		return nil
 	}
 

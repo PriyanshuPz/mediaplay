@@ -12,4 +12,8 @@ export default defineConfig({
       optimize: true,
     }),
   ],
+  build: {
+    outDir: "../static",
+    emptyOutDir: true,
+  },
 });

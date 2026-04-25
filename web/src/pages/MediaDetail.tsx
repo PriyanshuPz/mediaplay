@@ -9,6 +9,7 @@ import { MediaCard } from "../components/MediaCard";
 import { Modal } from "../components/modals/Modal";
 import { formatDate, resolveAssetUrl } from "../lib/utls";
 import type { Media } from "../lib/types";
+import { BiArrowBack } from "react-icons/bi";
 
 export function MediaDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,103 +39,118 @@ export function MediaDetail() {
   const thumbnail = resolveAssetUrl(media.thumbnail);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          className="text-sm text-muted-foreground hover:text-foreground self-start flex items-center gap-0.5"
         >
-          Back
+          <BiArrowBack /> Back
         </button>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setSearchOpen(true)}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            className="rounded-md border px-3 py-1.5 text-xs sm:text-sm hover:bg-accent"
           >
             Fix metadata
           </button>
 
           <button
             onClick={() => api.refreshMetadata(id!)}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            className="rounded-md border px-3 py-1.5 text-xs sm:text-sm hover:bg-accent"
           >
             Refresh
           </button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-        <div className="overflow-hidden rounded-lg border bg-card">
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt={media.title}
-              className="aspect-2/3 w-full object-cover"
-            />
-          ) : (
-            <div className="aspect-2/3 flex items-center justify-center text-muted-foreground">
-              No image
-            </div>
-          )}
+      <div className="grid gap-5 sm:gap-6 md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]">
+        <div className="mx-auto w-full max-w-55 sm:max-w-none md:max-w-60 lg:max-w-65">
+          <div className="overflow-hidden rounded-lg border bg-card">
+            {thumbnail ? (
+              <img
+                src={thumbnail}
+                alt={media.title}
+                className="
+                  w-full
+                  object-cover
+                  aspect-2/3
+                  max-h-80    
+                  sm:max-h-90
+                  md:max-h-105
+                  lg:max-h-120
+                "
+              />
+            ) : (
+              <div className="aspect-2/3 flex items-center justify-center text-muted-foreground">
+                No image
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">
+          <div className="space-y-1">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground leading-tight">
               {media.title}
             </h1>
-            <p className="text-sm text-muted-foreground">
+
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {media.series?.title || media.type}
             </p>
           </div>
 
           {media.description && (
-            <p className="text-sm text-muted-foreground">{media.description}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {media.description}
+            </p>
           )}
 
-          {media.type === "music" ? (
-            <button
-              onClick={() => navigate(`/listen/${media.id}`)}
-              className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
-            >
-              Listen
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate(`/player/${media.id}`)}
-              className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
-            >
-              Play
-            </button>
-          )}
+          <div>
+            {media.type === "music" ? (
+              <button
+                onClick={() => navigate(`/listen/${media.id}`)}
+                className="w-full sm:w-auto rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+              >
+                Listen
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate(`/player/${media.id}`)}
+                className="w-full sm:w-auto rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+              >
+                Play
+              </button>
+            )}
+          </div>
 
           {media.type === "series" && (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               Season {media.season?.number} • Episode {media.episode?.number}
             </div>
           )}
 
           {media.type === "music" && (
-            <div className="text-sm text-muted-foreground">Music track</div>
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              Music track
+            </div>
           )}
         </div>
       </div>
 
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg border bg-card p-3 sm:p-4">
         <MediaMeta media={media} />
       </div>
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-              Suggested Next
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Similar picks based on this title
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+            Suggested Next
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Similar picks based on this title
+          </p>
         </div>
 
         {suggestions.length === 0 ? (
@@ -146,7 +162,7 @@ export function MediaDetail() {
             {suggestions.map((item) => (
               <div
                 key={item.id}
-                className="w-37 min-w-37 snap-start sm:w-42 sm:min-w-42"
+                className="w-32 min-w-32 sm:w-36 sm:min-w-36 md:w-40 md:min-w-40 snap-start"
               >
                 <MediaCard media={item} />
               </div>

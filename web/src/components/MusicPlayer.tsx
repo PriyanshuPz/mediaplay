@@ -10,9 +10,8 @@ import {
   FaListUl,
 } from "react-icons/fa6";
 import { FaVolumeMute } from "react-icons/fa";
-import { api, getMediaStreamUrl, API_ORIGIN } from "../lib/api";
-import type { Media } from "../lib/types";
-import { formatTime } from "../lib/utls";
+import { api, getMediaStreamUrl } from "../lib/api";
+import { formatTime, resolveAssetUrl } from "../lib/utls";
 import { BiArrowBack } from "react-icons/bi";
 
 export function MusicPlayer() {
@@ -57,7 +56,6 @@ export function MusicPlayer() {
 
   const currentTrack = playlist[currentIndex];
 
-  // --- sync index with route ---
   useEffect(() => {
     if (!playlist.length || !id) return;
 
@@ -65,7 +63,6 @@ export function MusicPlayer() {
     setCurrentIndex(index >= 0 ? index : 0);
   }, [playlist, id]);
 
-  // --- bind audio events (IMPORTANT: depends on currentTrack) ---
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -89,9 +86,8 @@ export function MusicPlayer() {
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("ended", onEnd);
     };
-  }, [currentTrack]); // ✅ FIX
+  }, [currentTrack]);
 
-  // --- load + play track ---
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
@@ -101,7 +97,6 @@ export function MusicPlayer() {
     audio.src = url;
     audio.load();
 
-    // fallback: ensure duration is set
     audio.onloadedmetadata = () => {
       setDuration(audio.duration || 0);
     };
@@ -115,7 +110,6 @@ export function MusicPlayer() {
     setTime(0);
   }, [currentTrack]);
 
-  // --- controls ---
   const togglePlay = () => {
     const a = audioRef.current;
     if (!a) return;
@@ -158,11 +152,6 @@ export function MusicPlayer() {
     }
   };
 
-  const getThumb = (t: Media) =>
-    t.thumbnail?.startsWith("http")
-      ? t.thumbnail
-      : `${API_ORIGIN}${t.thumbnail}`;
-
   if (!currentTrack) {
     return (
       <div className="h-screen flex items-center justify-center text-muted-foreground">
@@ -191,7 +180,9 @@ export function MusicPlayer() {
         <div className="flex flex-col items-center text-center gap-4 mt-4">
           <div className="w-64 h-64 md:w-80 md:h-80">
             <img
-              src={getThumb(currentTrack) || "/placeholder.png"}
+              src={
+                resolveAssetUrl(currentTrack.thumbnail) || "/placeholder.png"
+              }
               className="w-full h-full object-cover"
             />
           </div>

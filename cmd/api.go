@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	web "mediaplay"
 	"mediaplay/internal/config"
 	"mediaplay/internal/res"
 	"mediaplay/internal/routes"
@@ -28,7 +29,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Mount("/api", routes.Routes(app.db, app.config))
-	r.Handle("/media/*", http.StripPrefix("/media/", http.FileServer(http.Dir(app.config.MediaPath))))
+	r.Handle("/m/*", http.StripPrefix("/m/", http.FileServer(http.Dir(app.config.MediaPath))))
 	r.Handle("/meta/*", http.StripPrefix("/meta/", http.FileServer(http.Dir(app.config.MediaMetaPath))))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +39,8 @@ func (app *application) mount() http.Handler {
 			"server_version": version,
 		}, "OK")
 	})
+
+	r.Handle("/*", web.Handler())
 
 	return r
 }

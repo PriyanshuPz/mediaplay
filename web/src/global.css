@@ -1,36 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  /* Base */
   --color-background: hsl(0 0% 6%);
   --color-foreground: hsl(0 0% 95%);
-
-  /* Surfaces */
   --color-card: hsl(0 0% 10%);
   --color-card-foreground: hsl(0 0% 95%);
-
   --color-popover: hsl(0 0% 10%);
   --color-popover-foreground: hsl(0 0% 95%);
-
-  /* Accent (Netflix red) */
   --color-primary: hsl(357 92% 47%);
   --color-primary-foreground: hsl(0 0% 100%);
-
-  /* Subtle layers */
   --color-secondary: hsl(0 0% 14%);
   --color-secondary-foreground: hsl(0 0% 90%);
-
   --color-muted: hsl(0 0% 14%);
   --color-muted-foreground: hsl(0 0% 60%);
-
   --color-accent: hsl(0 0% 16%);
   --color-accent-foreground: hsl(0 0% 95%);
-
-  /* States */
   --color-destructive: hsl(0 70% 40%);
   --color-destructive-foreground: hsl(0 0% 100%);
-
-  /* UI elements */
   --color-border: hsl(0 0% 18%);
   --color-input: hsl(0 0% 18%);
   --color-ring: hsl(357 92% 47%);
@@ -47,9 +33,12 @@
     background: var(--color-background);
     color: var(--color-foreground);
   }
+
+  button {
+    cursor: pointer;
+  }
 }
 
-/* extra tokens */
 @theme {
   --radius-sm: 2px;
   --radius-md: 4px;

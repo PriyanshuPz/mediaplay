@@ -3,9 +3,21 @@ import { API_ORIGIN } from "./api";
 export function resolveAssetUrl(path?: string) {
   if (!path) return "";
 
-  if (path.startsWith("http")) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
 
-  return `${API_ORIGIN}${path.startsWith("/") ? path : "/" + path}`;
+  let p = path.startsWith("/") ? path : `/${path}`;
+
+  if (p.startsWith("/media/")) {
+    p = p.replace("/media/", "/m/");
+  }
+
+  if (p.startsWith("/media/meta/") || p.startsWith("/meta/")) {
+    p = p.replace("/media/meta/", "/meta/");
+  }
+
+  return `${API_ORIGIN}${p}`;
 }
 
 export function cn(...classes: (string | false | undefined)[]) {
