@@ -238,12 +238,15 @@ func (s *service) tmdbCandidates(ctx context.Context, title string, mediaType st
 
 	var payload struct {
 		Results []struct {
-			ID           int    `json:"id"`
-			PosterPath   string `json:"poster_path"`
-			Title        string `json:"title"`
-			Name         string `json:"name"`
-			ReleaseDate  string `json:"release_date"`
-			FirstAirDate string `json:"first_air_date"`
+			ID            int    `json:"id"`
+			PosterPath    string `json:"poster_path"`
+			Title         string `json:"title"`
+			Name          string `json:"name"`
+			ReleaseDate   string `json:"release_date"`
+			FirstAirDate  string `json:"first_air_date"`
+			OriginalTitle string `json:"original_title"`
+			Overview      string `json:"overview"`
+			Popularity    string `json:"popularity"`
 		} `json:"results"`
 	}
 

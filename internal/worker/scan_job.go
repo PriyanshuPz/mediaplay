@@ -216,7 +216,6 @@ func (j *ScanJob) upsertMedia(
 		}
 	}
 
-	// async metadata
 	go j.fetchMetadata(media.ID, title)
 
 	return nil
@@ -270,13 +269,7 @@ func isMediaFile(path string) bool {
 	return false
 }
 
-func extractTitle(path string) string {
-	base := filepath.Base(path)
-	return strings.TrimSuffix(base, filepath.Ext(base))
-}
-
 func (j *ScanJob) fetchMetadata(mediaID uint, title string) {
-	// TODO! call OMDb or your scraper
 
 	meta := map[string]interface{}{
 		"title":   title,
@@ -293,7 +286,6 @@ func (j *ScanJob) fetchMetadata(mediaID uint, title string) {
 func guessSeriesInfo(path string) (seriesName string, season int, ok bool) {
 	lower := strings.ToLower(path)
 
-	// detect S01E02 pattern
 	re := regexp.MustCompile(`s(\d{1,2})e(\d{1,2})`)
 	match := re.FindStringSubmatch(lower)
 
@@ -302,9 +294,39 @@ func guessSeriesInfo(path string) (seriesName string, season int, ok bool) {
 		ok = true
 	}
 
-	// fallback: parent folder as series
 	dir := filepath.Dir(path)
 	seriesName = filepath.Base(filepath.Dir(dir))
 
 	return
+}
+
+func extractTitle(filename string) string {
+	// Normalize separators to spaces
+	reSeparators := regexp.MustCompile(`[._-]+`)
+	name := reSeparators.ReplaceAllString(filename, " ")
+
+	// Remove years (1900–2099)
+	reYear := regexp.MustCompile(`\b(19|20)\d{2}\b`)
+	name = reYear.ReplaceAllString(name, "")
+
+	// Noise words to remove
+	noiseWords := []string{
+		"official", "trailer", "teaser", "4k", "ultra", "hd", "60fps",
+		"new", "hindi", "dubbed", "sony", "pictures",
+	}
+
+	// Remove noise words (case-insensitive)
+	for _, word := range noiseWords {
+		re := regexp.MustCompile(`(?i)\b` + word + `\b`)
+		name = re.ReplaceAllString(name, "")
+	}
+
+	// Collapse multiple spaces
+	reSpaces := regexp.MustCompile(`\s+`)
+	name = reSpaces.ReplaceAllString(name, " ")
+
+	name = strings.TrimSpace(name)
+
+	// Title case (basic)
+	return strings.Title(strings.ToLower(name))
 }
