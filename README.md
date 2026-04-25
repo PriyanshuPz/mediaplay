@@ -13,6 +13,9 @@ You can use this to manage your movies, music, and web series locally with autom
 - Built with Go backend (single binary possible)
 - No login, no auth, just plug and use
 
+## Demo
+https://github.com/user-attachments/assets/fa248d02-f0d1-443d-a3a4-6befe3f0aad9
+
 ## Installation
 
 ### Option 1 — Prebuilt Binary (Recommended)
