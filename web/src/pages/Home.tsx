@@ -45,7 +45,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* Stats */}
       {loadingStats ? (
         <LoadingSpinner />
       ) : stats ? (
@@ -56,7 +55,6 @@ export function Home() {
         </div>
       ) : null}
 
-      {/* Feed */}
       {loadingFeed ? (
         <LoadingSpinner />
       ) : homeFeed ? (

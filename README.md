@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/fa248d02-f0d1-443d-a3a4-6befe3f0aad9
 
 ### Option 1 — Prebuilt Binary (Recommended)
 
-Download the latest release from GitHub [(Releases)](https://github.com/PriyanshuPz/mediaplay/releases).
+Download the latest release from GitHub [**Releases**](https://github.com/PriyanshuPz/mediaplay/releases).
 
 Pick the correct file for your system:
 
@@ -59,23 +59,11 @@ docker run -d \
   ghcr.io/priyanshupz/mediaplay:latest
 ```
 
-Then open:
-
-```
-http://localhost:8000
-```
-
-#### Notes
-
-- Replace `/path/to/your/media` with your actual media folder
-- Container expects media at `/media`
-- Works on amd64, arm64, arm/v7 (Raspberry Pi)
-
 ### Option 3 — Build from Source
 
 Requirements:
 
-- Go 1.22+
+- Go 1.26+
 - pnpm (for frontend)
 
 ```bash
@@ -95,12 +83,6 @@ Run:
 ```bash
 ./mediaplay
 ```
-
-Your README is already good, but it’s missing one important thing now that you added flags: **clear CLI usage + correct config naming**. Right now it still implies env-only and uses `DATABASE_URL` (which is misleading).
-
-Here’s a tightened, updated version of the relevant parts. I’m not rewriting everything—just fixing what matters.
-
----
 
 ## Configuration
 
@@ -143,8 +125,6 @@ DATABASE_PATH=app_data.db
 PORT=8000
 ```
 
----
-
 ### Example
 
 ```bash
@@ -173,6 +153,8 @@ This is very important. Scanner depends on this structure.
     /Album
       song.mp3
 ```
+
+Detail Docs [Check HERE](./docs/).
 
 ### Notes
 

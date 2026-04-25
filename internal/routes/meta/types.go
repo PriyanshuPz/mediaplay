@@ -27,7 +27,6 @@ type RefreshMetadataInput struct {
 
 type UpdateMetadataInput = MetadataCandidate
 
-// Convert from metadata service type to API type
 func FromMetadataCandidate(mc metadata.MetadataCandidate) MetadataCandidate {
 	return MetadataCandidate{
 		URL:           mc.URL,
@@ -44,7 +43,6 @@ func FromMetadataCandidate(mc metadata.MetadataCandidate) MetadataCandidate {
 	}
 }
 
-// Convert from API type to metadata service type
 func ToMetadataCandidate(mc MetadataCandidate) metadata.MetadataCandidate {
 	return metadata.MetadataCandidate{
 		URL:           mc.URL,
