@@ -80,6 +80,33 @@ func (h *handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	res.Success(w, data, "media fetched successfully")
 }
 
+func (h *handler) GetRecommendations(w http.ResponseWriter, r *http.Request) {
+	id, err := parseMediaID(r)
+	if err != nil {
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	limit := 12
+	if value := r.URL.Query().Get("limit"); value != "" {
+		parsed, parseErr := strconv.Atoi(value)
+		if parseErr != nil || parsed <= 0 {
+			res.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+		limit = parsed
+	}
+
+	data, err := h.service.GetRecommendations(r.Context(), id, limit)
+	if err != nil {
+		log.Println(err)
+		res.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res.Success(w, data, "recommendations fetched successfully")
+}
+
 func (h *handler) StreamMedia(w http.ResponseWriter, r *http.Request) {
 	h.service.StreamMedia(w, r)
 }

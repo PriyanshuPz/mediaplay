@@ -15,8 +15,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -34,6 +37,7 @@ type Service interface {
 	GetHomeFeed(ctx context.Context) (HomeFeed, error)
 	ListMedia(ctx context.Context, mediaType *db.MediaType) ([]db.Media, error)
 	GetMedia(ctx context.Context, id uint) (MediaDetail, error)
+	GetRecommendations(ctx context.Context, id uint, limit int) ([]db.Media, error)
 	StreamMedia(w http.ResponseWriter, r *http.Request)
 	UpdateMedia(ctx context.Context, id uint, input UpdateMediaInput) error
 	DeleteMedia(ctx context.Context, id uint) error
@@ -113,6 +117,141 @@ func (s *service) GetMedia(ctx context.Context, id uint) (MediaDetail, error) {
 	}
 
 	return MediaDetail{Media: media}, nil
+}
+
+func (s *service) GetRecommendations(ctx context.Context, id uint, limit int) ([]db.Media, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 24 {
+		limit = 24
+	}
+
+	var current db.Media
+	if err := s.db.WithContext(ctx).
+		Preload("Series").
+		Preload("Season").
+		First(&current, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+
+	var candidates []db.Media
+	query := s.db.WithContext(ctx).
+		Model(&db.Media{}).
+		Preload("Series").
+		Preload("Season").
+		Where("id <> ?", current.ID).
+		Where("type = ?", current.Type).
+		Order("updated_at desc").
+		Limit(120)
+
+	if err := query.Find(&candidates).Error; err != nil {
+		return nil, err
+	}
+
+	targetTokens := mediaTokens(current)
+
+	type scoredMedia struct {
+		media db.Media
+		score int
+	}
+
+	scored := make([]scoredMedia, 0, len(candidates))
+	for _, candidate := range candidates {
+		score := 0
+
+		if current.SeriesID != nil && candidate.SeriesID != nil && *current.SeriesID == *candidate.SeriesID {
+			score += 80
+		}
+
+		if current.SeasonID != nil && candidate.SeasonID != nil && *current.SeasonID == *candidate.SeasonID {
+			score += 30
+		}
+
+		overlap := tokenOverlap(targetTokens, mediaTokens(candidate))
+		score += overlap * 5
+
+		if score > 0 {
+			scored = append(scored, scoredMedia{media: candidate, score: score})
+		}
+	}
+
+	sort.SliceStable(scored, func(i, j int) bool {
+		if scored[i].score == scored[j].score {
+			return scored[i].media.UpdatedAt.After(scored[j].media.UpdatedAt)
+		}
+		return scored[i].score > scored[j].score
+	})
+
+	recommendations := make([]db.Media, 0, limit)
+	for _, item := range scored {
+		recommendations = append(recommendations, item.media)
+		if len(recommendations) == limit {
+			return recommendations, nil
+		}
+	}
+
+	if len(recommendations) == limit {
+		return recommendations, nil
+	}
+
+	for _, candidate := range candidates {
+		if containsMediaID(recommendations, candidate.ID) {
+			continue
+		}
+		recommendations = append(recommendations, candidate)
+		if len(recommendations) == limit {
+			break
+		}
+	}
+
+	return recommendations, nil
+}
+
+func mediaTokens(media db.Media) map[string]struct{} {
+	combined := strings.Join([]string{media.Title, media.Description, media.ExternalID}, " ")
+	parts := strings.FieldsFunc(strings.ToLower(combined), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+
+	tokens := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		if len(part) < 2 {
+			continue
+		}
+		tokens[part] = struct{}{}
+	}
+
+	return tokens
+}
+
+func tokenOverlap(a, b map[string]struct{}) int {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+
+	count := 0
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+
+	for token := range a {
+		if _, ok := b[token]; ok {
+			count++
+		}
+	}
+
+	return count
+}
+
+func containsMediaID(items []db.Media, id uint) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *service) StreamMedia(w http.ResponseWriter, r *http.Request) {

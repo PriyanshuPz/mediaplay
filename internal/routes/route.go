@@ -18,6 +18,7 @@ func Routes(db *gorm.DB, cfg *config.Config) *chi.Mux {
 	r.Get("/home", mediaHandler.GetHomeFeed)
 	r.Get("/media", mediaHandler.ListMedia)
 	r.Get("/media/{id}", mediaHandler.GetMedia)
+	r.Get("/media/{id}/recommendations", mediaHandler.GetRecommendations)
 	r.Get("/media/{id}/stream", mediaHandler.StreamMedia)
 
 	metaService := meta.NewService(db, cfg)

@@ -70,6 +70,16 @@ export const api = {
     return apiCall(`/media/${id}`);
   },
 
+  async getMediaRecommendations(id: string, limit = 12): Promise<Media[]> {
+    const params = new URLSearchParams();
+    if (limit > 0) {
+      params.set("limit", String(limit));
+    }
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return apiCall(`/media/${id}/recommendations${suffix}`);
+  },
+
   async getMetadataCandidates(
     id: string,
     query?: string,

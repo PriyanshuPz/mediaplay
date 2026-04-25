@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MetadataSearchPanel } from "../components/MetadataSearchPanel";
+import { MediaCard } from "../components/MediaCard";
 import { Modal } from "../components/modals/Modal";
 import { formatDate, resolveAssetUrl } from "../lib/utls";
 import type { Media } from "../lib/types";
@@ -21,6 +22,12 @@ export function MediaDetail() {
   } = useQuery({
     queryKey: ["media", id],
     queryFn: () => api.getMediaById(id!),
+    enabled: !!id,
+  });
+
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ["media-recommendations", id],
+    queryFn: () => api.getMediaRecommendations(id!, 12),
     enabled: !!id,
   });
 
@@ -117,6 +124,37 @@ export function MediaDetail() {
       <div className="rounded-lg border bg-card p-4">
         <MediaMeta media={media} />
       </div>
+
+      <section className="space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Suggested Next
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Similar picks based on this title
+            </p>
+          </div>
+        </div>
+
+        {suggestions.length === 0 ? (
+          <div className="rounded-md border border-dashed bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            No similar media found yet.
+          </div>
+        ) : (
+          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+            {suggestions.map((item) => (
+              <div
+                key={item.id}
+                className="w-37 min-w-37 snap-start sm:w-42 sm:min-w-42"
+              >
+                <MediaCard media={item} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {searchOpen && (
         <Modal onClose={() => setSearchOpen(false)}>
           <div className="mb-3 flex items-center justify-between">
