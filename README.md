@@ -14,13 +14,14 @@ You can use this to manage your movies, music, and web series locally with autom
 - No login, no auth, just plug and use
 
 ## Demo
+
 https://github.com/user-attachments/assets/fa248d02-f0d1-443d-a3a4-6befe3f0aad9
 
 ## Installation
 
 ### Option 1 — Prebuilt Binary (Recommended)
 
-Download the latest release from GitHub [(Releases section)]().
+Download the latest release from GitHub [(Releases)](https://github.com/PriyanshuPz/mediaplay/releases).
 
 Pick the correct file for your system:
 
@@ -55,7 +56,7 @@ Pull and run:
 docker run -d \
   -p 8000:8000 \
   -v /path/to/your/media:/media \
-  ghcr.io/p8labs/mediaplay:latest
+  ghcr.io/priyanshupz/mediaplay:latest
 ```
 
 Then open:
@@ -78,7 +79,7 @@ Requirements:
 - pnpm (for frontend)
 
 ```bash
-git clone https://github.com/p8labs/mediaplay.git
+git clone https://github.com/PriyanshuPz/mediaplay.git
 cd mediaplay
 
 cd web
@@ -95,20 +96,59 @@ Run:
 ./mediaplay
 ```
 
+Your README is already good, but it’s missing one important thing now that you added flags: **clear CLI usage + correct config naming**. Right now it still implies env-only and uses `DATABASE_URL` (which is misleading).
+
+Here’s a tightened, updated version of the relevant parts. I’m not rewriting everything—just fixing what matters.
+
 ---
 
-### Configuration
+## Configuration
 
-Currently minimal.
+MediaPlay supports both **environment variables** and **CLI flags**.
+
+### Priority Order
+
+1. CLI flags (highest priority)
+2. `.env` file
+3. system environment
+4. defaults
+
+### CLI Flags (Recommended)
+
+```bash
+./mediaplay \
+  --port 8000 \
+  --media ./media \
+  --db app_data.db \
+  --tmdb YOUR_API_KEY
+```
+
+Available flags:
+
+- `--port` → server port (default: `8000`)
+- `--media` → media directory (default: `./media`)
+- `--db` → database file path (default: `app_data.db`)
+- `--tmdb` → TMDB API key (optional)
+
+### Environment Variables
+
+You can also use a `.env` file:
 
 ```env
-
-TMDB_API_KEY="" # get this from https://www.themoviedb.org if want rich metadata
+TMDB_API_KEY=your_api_key
 
 # defaults
-MEDIA_PATH="./media"
-DATABASE_URL="app_data.db"
-PORT="8000"
+MEDIA_PATH=./media
+DATABASE_PATH=app_data.db
+PORT=8000
+```
+
+---
+
+### Example
+
+```bash
+./mediaplay --media /mnt/media --port 9000
 ```
 
 ## Media Folder Structure

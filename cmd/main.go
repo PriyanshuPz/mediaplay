@@ -16,11 +16,15 @@ var version = "dev"
 
 func main() {
 
-	cfg := config.Load()
+	cfg := config.WithFlags(config.Load())
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
-
 	logger.Info("starting mediaplay server", "version", version)
+	logger.Info("config loaded",
+		"port", cfg.Port,
+		"db", cfg.DatabasePath,
+		"media", cfg.MediaPath,
+	)
 
 	db, err := gorm.Open(sqlite.Open(cfg.DatabasePath), &gorm.Config{})
 
